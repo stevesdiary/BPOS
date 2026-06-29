@@ -1,0 +1,59 @@
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+  HOST: z.string().default('0.0.0.0'),
+
+  // Database
+  DATABASE_URL: z.string().url(),
+
+  // JWT
+  JWT_ACCESS_SECRET: z.string().min(32),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_REFRESH_EXPIRY: z.string().default('7d'),
+
+  // Redis
+  REDIS_URL: z.string().default('redis://localhost:6379'),
+
+  // Cloudflare R2
+  R2_ACCOUNT_ID: z.string(),
+  R2_ACCESS_KEY_ID: z.string(),
+  R2_SECRET_ACCESS_KEY: z.string(),
+  R2_BUCKET_NAME: z.string(),
+  R2_PUBLIC_URL: z.string().url(),
+
+  // Paystack
+  PAYSTACK_SECRET_KEY: z.string(),
+  PAYSTACK_PUBLIC_KEY: z.string(),
+
+  // Termii SMS
+  TERMII_API_KEY: z.string(),
+  TERMII_SENDER_ID: z.string().default('BPOS'),
+
+  // WhatsApp (Phase 2 — optional at launch)
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+
+  // Platform
+  PLATFORM_BASE_URL: z.string().url().default('http://localhost:3000'),
+  CORS_ORIGINS: z.string().default('http://localhost:3001,http://localhost:3002'),
+
+  // Feature flags
+  SWAGGER_ENABLED: z.coerce.boolean().default(true),
+});
+
+function parseEnv() {
+  const result = envSchema.safeParse(process.env);
+  if (!result.success) {
+    const formatted = result.error.format();
+    console.error('Invalid environment configuration:', JSON.stringify(formatted, null, 2));
+    process.exit(1);
+  }
+  return result.data;
+}
+
+export const env = parseEnv();
+export type Env = z.infer<typeof envSchema>;

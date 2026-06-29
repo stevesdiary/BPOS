@@ -26,6 +26,7 @@ import staffRoutes from './modules/staff/routes.js';
 import expensesRoutes from './modules/expenses/routes.js';
 import reportingRoutes from './modules/reporting/routes.js';
 import invoicingRoutes from './modules/invoicing/routes.js';
+import whatsappRoutes from './modules/whatsapp/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -88,6 +89,7 @@ export function buildApp() {
   void app.register(expensesRoutes,     { prefix: '/v1/expenses' });
   void app.register(reportingRoutes,    { prefix: '/v1/reports' });
   void app.register(invoicingRoutes,    { prefix: '/v1/invoices' });
+  void app.register(whatsappRoutes,    { prefix: '/v1/whatsapp' });
 
   return app;
 }

@@ -32,10 +32,17 @@ const envSchema = z.object({
   TERMII_API_KEY: z.string(),
   TERMII_SENDER_ID: z.string().default('BPOS'),
 
+  // Flutterwave (Phase 2 — alternative gateway)
+  FLUTTERWAVE_SECRET_KEY: z.string().optional(),
+  FLUTTERWAVE_PUBLIC_KEY: z.string().optional(),
+  FLUTTERWAVE_WEBHOOK_SECRET: z.string().optional(),
+  DEFAULT_PAYMENT_GATEWAY: z.enum(['paystack', 'flutterwave']).default('paystack'),
+
   // WhatsApp (Phase 2 — optional at launch)
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
 
   // Platform
   PLATFORM_BASE_URL: z.string().url().default('http://localhost:3000'),

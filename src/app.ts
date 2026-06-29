@@ -14,6 +14,10 @@ import metricsPlugin from './plugins/metrics.js';
 // Module routes
 import authRoutes from './modules/auth/routes.js';
 import tenantRoutes from './modules/tenants/routes.js';
+import productsRoutes from './modules/products/routes.js';
+import inventoryRoutes from './modules/inventory/routes.js';
+import customersRoutes from './modules/customers/routes.js';
+import ordersRoutes from './modules/orders/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -64,6 +68,10 @@ export function buildApp() {
   // Module routes
   void app.register(authRoutes, { prefix: '/v1/auth' });
   void app.register(tenantRoutes, { prefix: '/v1/tenants' });
+  void app.register(productsRoutes, { prefix: '/v1/products' });
+  void app.register(inventoryRoutes, { prefix: '/v1/inventory' });
+  void app.register(customersRoutes, { prefix: '/v1/customers' });
+  void app.register(ordersRoutes, { prefix: '/v1/orders' });
 
   return app;
 }

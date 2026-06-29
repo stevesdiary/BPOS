@@ -20,6 +20,7 @@ import customersRoutes from './modules/customers/routes.js';
 import ordersRoutes from './modules/orders/routes.js';
 import paymentsRoutes from './modules/payments/routes.js';
 import ledgerRoutes from './modules/ledger/routes.js';
+import subscriptionsRoutes from './modules/subscriptions/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -76,6 +77,7 @@ export function buildApp() {
   void app.register(ordersRoutes, { prefix: '/v1/orders' });
   void app.register(paymentsRoutes, { prefix: '/v1/payments' });
   void app.register(ledgerRoutes, { prefix: '/v1/ledger' });
+  void app.register(subscriptionsRoutes, { prefix: '/v1/subscriptions' });
 
   return app;
 }

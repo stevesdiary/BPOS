@@ -5,6 +5,7 @@ import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { paystackGateway } from '../../shared/payments/paystack.js';
 import { initiatePayment, handlePaystackWebhook } from './service.js';
 import type { PaystackWebhookData } from './service.js';
+import { handleSubscriptionBillingWebhook } from '../subscriptions/service.js';
 
 interface WebhookRequest extends FastifyRequest {
   rawBody: string;
@@ -97,13 +98,32 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
         const payload = request.body as { event: string; data: PaystackWebhookData };
 
         // Resolve tenant from webhook metadata (set during payment initiation)
-        const schemaName = (payload.data?.metadata?.schemaName as string | undefined) ?? '';
+        const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
+        const schemaName = (meta['schemaName'] as string | undefined) ?? '';
         if (!schemaName) {
           // Unknown tenant — acknowledge receipt but take no action
           return reply.send({ success: true });
         }
 
-        await handlePaystackWebhook(schemaName, payload.event, payload.data);
+        // Route: subscription billing events vs order payment events
+        if (meta['type'] === 'subscription') {
+          const tenantId = (meta['tenantId'] as string | undefined) ?? '';
+          const planTier = (meta['planTier'] as string | undefined) ?? '';
+          const rawData = payload.data as unknown as Record<string, unknown>;
+          const authorization = rawData['authorization'] as Record<string, unknown> | undefined;
+          const customer = rawData['customer'] as Record<string, unknown> | undefined;
+          await handleSubscriptionBillingWebhook(
+            payload.event,
+            tenantId,
+            schemaName,
+            planTier as 'entry' | 'growth' | 'enterprise',
+            (authorization?.['authorization_code'] as string | undefined) ?? '',
+            (customer?.['customer_code'] as string | undefined) ?? '',
+          ).catch(() => {});
+        } else {
+          await handlePaystackWebhook(schemaName, payload.event, payload.data);
+        }
+
         return reply.send({ success: true });
       },
     );

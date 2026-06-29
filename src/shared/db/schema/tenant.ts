@@ -354,12 +354,15 @@ export const journalLines = pgTable(
 export const subscriptions = pgTable('subscriptions', {
   id: text('id').primaryKey(),
   planTier: text('plan_tier').notNull().default('trial'),
-  status: text('status').notNull().default('trial'), // mirrors subscriptionStatusEnum
+  status: text('status').notNull().default('trial'), // mirrors subscriptionStatusEnum values
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
   currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
   trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
   paystackSubscriptionCode: text('paystack_subscription_code'),
+  // Card authorization code saved from first payment — used for recurring billing
+  paystackAuthorizationCode: text('paystack_authorization_code'),
+  paystackCustomerCode: text('paystack_customer_code'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

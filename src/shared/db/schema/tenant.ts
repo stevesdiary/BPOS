@@ -127,6 +127,9 @@ export const productVariants = pgTable(
     // All monetary values stored in kobo (smallest NGN unit = 1/100 of a naira)
     priceKobo: integer('price_kobo').notNull(),
     costKobo: integer('cost_kobo').notNull().default(0),
+    // Tax rate in basis points (10000 = 100%). Nigeria standard VAT = 750 (7.5%).
+    // null = no tax / inherit from business default. Only visible to manager+.
+    taxRateBps: integer('tax_rate_bps'),
     attributes: text('attributes'), // JSON string: { color: 'red', size: 'M' }
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -197,6 +200,9 @@ export const customers = pgTable(
     phone: text('phone'), // PII
     address: text('address'), // PII
     note: text('note'),
+    // NDPR compliance: record when and how the customer consented to data collection
+    consentGivenAt: timestamp('consent_given_at', { withTimezone: true }),
+    consentSource: text('consent_source'), // 'pos_signup' | 'whatsapp_chat' | 'web_checkout' | 'manual'
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

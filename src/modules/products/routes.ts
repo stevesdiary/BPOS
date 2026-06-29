@@ -3,6 +3,15 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { requireManager } from '../../shared/middleware/auth.js';
+import type { ProductVariant } from '../../shared/db/schema/tenant.js';
+
+// Strip cost price from variant responses for staff — they must not see margin data.
+// Managers, owners, and viewers retain full variant data.
+function sanitizeVariant(v: ProductVariant, hideMargin: boolean): Omit<ProductVariant, 'costKobo'> | ProductVariant {
+  if (!hideMargin) return v;
+  const { costKobo: _cost, ...safe } = v;
+  return safe;
+}
 import {
   createCategory,
   listCategories,
@@ -156,7 +165,14 @@ export default async function productsRoutes(app: FastifyInstance) {
     },
     async (request) => {
       const product = await getProduct(request.tenant.schema, request.params.id);
-      return { success: true, data: product };
+      const hideMargin = request.user.role === 'staff';
+      return {
+        success: true,
+        data: {
+          ...product,
+          variants: product.variants.map((v) => sanitizeVariant(v, hideMargin)),
+        },
+      };
     },
   );
 
@@ -214,6 +230,7 @@ export default async function productsRoutes(app: FastifyInstance) {
       name: string;
       priceKobo: number;
       costKobo?: number;
+      taxRateBps?: number;
       attributes?: string;
     };
   }>(
@@ -237,6 +254,8 @@ export default async function productsRoutes(app: FastifyInstance) {
             name: { type: 'string', minLength: 1 },
             priceKobo: { type: 'integer', minimum: 0 },
             costKobo: { type: 'integer', minimum: 0 },
+            taxRateBps: { type: 'integer', minimum: 0, maximum: 10000,
+              description: 'Tax rate in basis points (10000 = 100%). Nigeria VAT = 750.' },
             attributes: { type: 'string' },
           },
           additionalProperties: false,
@@ -259,6 +278,7 @@ export default async function productsRoutes(app: FastifyInstance) {
       name: string;
       priceKobo: number;
       costKobo: number;
+      taxRateBps: number | null;
       attributes: string | null;
       isActive: boolean;
     }>;
@@ -284,6 +304,7 @@ export default async function productsRoutes(app: FastifyInstance) {
             name: { type: 'string', minLength: 1 },
             priceKobo: { type: 'integer', minimum: 0 },
             costKobo: { type: 'integer', minimum: 0 },
+            taxRateBps: { type: ['integer', 'null'], minimum: 0, maximum: 10000 },
             attributes: { type: ['string', 'null'] },
             isActive: { type: 'boolean' },
           },

@@ -42,7 +42,8 @@ vi.mock('../../src/modules/products/service.js', () => ({
         sku: 'SKU-001',
         name: 'Default',
         priceKobo: 50000,
-        costKobo: 0,
+        costKobo: 25000,
+        taxRateBps: 750,
         attributes: null,
         isActive: true,
         createdAt: new Date().toISOString(),
@@ -83,6 +84,7 @@ vi.mock('../../src/shared/middleware/feature-gate.js', () => ({
 
 let app: FastifyInstance;
 let bearerToken: string;
+let staffToken: string;
 
 beforeAll(async () => {
   app = await getTestApp();
@@ -91,6 +93,13 @@ beforeAll(async () => {
     tid: 'tenant-test',
     role: 'owner',
     email: 'owner@test.com',
+    type: 'access',
+  });
+  staffToken = app.jwt.sign({
+    sub: 'staff-test',
+    tid: 'tenant-test',
+    role: 'staff',
+    email: 'staff@test.com',
     type: 'access',
   });
 });
@@ -187,5 +196,35 @@ describe('Products API', () => {
     });
 
     expect(response.statusCode).toBe(401);
+  });
+
+  it('GET /v1/products/:id — owner sees costKobo on variants', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/products/prod-1',
+      headers: { Authorization: `Bearer ${bearerToken}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ data: { variants: Array<Record<string, unknown>> } }>();
+    const variant = body.data.variants[0]!;
+    expect(variant).toHaveProperty('costKobo');
+    expect(variant['costKobo']).toBe(25000);
+  });
+
+  it('GET /v1/products/:id — staff does NOT see costKobo on variants', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/products/prod-1',
+      headers: { Authorization: `Bearer ${staffToken}` },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ data: { variants: Array<Record<string, unknown>> } }>();
+    const variant = body.data.variants[0]!;
+    expect(variant).not.toHaveProperty('costKobo');
+    // Staff can still see sales price and tax rate
+    expect(variant['priceKobo']).toBe(50000);
+    expect(variant['taxRateBps']).toBe(750);
   });
 });

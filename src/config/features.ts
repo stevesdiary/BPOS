@@ -16,8 +16,10 @@ export type FeatureKey =
   | 'payments:refund'
   | 'ledger:view'
   | 'reporting:pl'
+  | 'reporting:margin'
   | 'reporting:staff_sales'
   | 'reporting:revenue_by_location'
+  | 'reporting:cash_recon'
   | 'invoicing:generate'
   | 'expenses:track'
   | 'staff:invite'
@@ -45,8 +47,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'payments:refund': { allowed: false },
     'ledger:view': { allowed: true },
     'reporting:pl': { allowed: false },
+    'reporting:margin': { allowed: false },
     'reporting:staff_sales': { allowed: false },
     'reporting:revenue_by_location': { allowed: false },
+    'reporting:cash_recon': { allowed: false },
     'invoicing:generate': { allowed: false },
     'expenses:track': { allowed: false },
     'staff:invite': { allowed: false },
@@ -66,8 +70,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'payments:refund': { allowed: true },
     'ledger:view': { allowed: true },
     'reporting:pl': { allowed: true },
+    'reporting:margin': { allowed: true },
     'reporting:staff_sales': { allowed: true },
     'reporting:revenue_by_location': { allowed: false },
+    'reporting:cash_recon': { allowed: true },
     'invoicing:generate': { allowed: true },
     'expenses:track': { allowed: true },
     'staff:invite': { allowed: true },
@@ -87,8 +93,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'payments:refund': { allowed: true },
     'ledger:view': { allowed: true },
     'reporting:pl': { allowed: true },
+    'reporting:margin': { allowed: true },
     'reporting:staff_sales': { allowed: true },
     'reporting:revenue_by_location': { allowed: true },
+    'reporting:cash_recon': { allowed: true },
     'invoicing:generate': { allowed: true },
     'expenses:track': { allowed: true },
     'staff:invite': { allowed: true },
@@ -108,8 +116,10 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'payments:refund': { allowed: true },
     'ledger:view': { allowed: true },
     'reporting:pl': { allowed: true },
+    'reporting:margin': { allowed: true },
     'reporting:staff_sales': { allowed: true },
     'reporting:revenue_by_location': { allowed: true },
+    'reporting:cash_recon': { allowed: true },
     'invoicing:generate': { allowed: true },
     'expenses:track': { allowed: true },
     'staff:invite': { allowed: true },

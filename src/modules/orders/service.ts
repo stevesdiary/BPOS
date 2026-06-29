@@ -52,8 +52,23 @@ export async function createOrder(
     const nextNum = parseInt(row?.count ?? '0') + 1;
     const orderNumber = `ORD-${String(nextNum).padStart(6, '0')}`;
 
+    // Auto-compute taxKobo from variant's taxRateBps when not explicitly provided.
+    // taxRateBps is stored as basis points (10000 = 100%), so 7.5% VAT = 750.
+    const variantIds = input.items.map((i) => i.variantId);
+    const variantRows = await db
+      .select({ id: productVariants.id, taxRateBps: productVariants.taxRateBps })
+      .from(productVariants)
+      .where(inArray(productVariants.id, variantIds));
+    const taxRateMap = new Map(variantRows.map((v) => [v.id, v.taxRateBps ?? 0]));
+
+    const itemsWithTax = input.items.map((item) => ({
+      ...item,
+      taxKobo: item.taxKobo ??
+        Math.floor(item.quantity * item.unitPriceKobo * (taxRateMap.get(item.variantId) ?? 0) / 10000),
+    }));
+
     const { subtotalKobo, totalKobo, lineTotalsKobo } = calculateOrderTotals(
-      input.items,
+      itemsWithTax,
       input.discountKobo,
       input.taxKobo,
     );
@@ -75,14 +90,14 @@ export async function createOrder(
     });
 
     await db.insert(orderItems).values(
-      input.items.map((item, i) => ({
+      itemsWithTax.map((item, i) => ({
         id: uuidv4(),
         orderId,
         variantId: item.variantId,
         quantity: item.quantity,
         unitPriceKobo: item.unitPriceKobo,
         discountKobo: item.discountKobo ?? 0,
-        taxKobo: item.taxKobo ?? 0,
+        taxKobo: item.taxKobo,
         lineTotalKobo: lineTotalsKobo[i] ?? 0,
       })),
     );

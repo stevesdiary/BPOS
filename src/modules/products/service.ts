@@ -167,6 +167,7 @@ export async function createVariant(
     name: string;
     priceKobo: number;
     costKobo?: number;
+    taxRateBps?: number;
     attributes?: string;
   },
 ) {
@@ -193,6 +194,7 @@ export async function createVariant(
       name: input.name,
       priceKobo: input.priceKobo,
       costKobo: input.costKobo ?? 0,
+      ...(input.taxRateBps !== undefined && { taxRateBps: input.taxRateBps }),
       attributes: input.attributes ?? null,
     });
 
@@ -236,6 +238,7 @@ export async function updateVariant(
     name: string;
     priceKobo: number;
     costKobo: number;
+    taxRateBps: number | null;
     attributes: string | null;
     isActive: boolean;
   }>,

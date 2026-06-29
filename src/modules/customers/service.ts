@@ -15,6 +15,8 @@ export async function createCustomer(
     phone?: string;
     address?: string;
     note?: string;
+    consentGivenAt?: string; // ISO 8601 — the moment the customer consented to data collection
+    consentSource?: string;  // 'pos_signup' | 'whatsapp_chat' | 'web_checkout' | 'manual'
   },
 ) {
   return withTenantSchema(schemaName, async (db) => {
@@ -27,6 +29,8 @@ export async function createCustomer(
       phone: input.phone ?? null,
       address: input.address ?? null,
       note: input.note ?? null,
+      ...(input.consentGivenAt && { consentGivenAt: new Date(input.consentGivenAt) }),
+      ...(input.consentSource && { consentSource: input.consentSource }),
     });
     const [customer] = await db.select().from(customers).where(eq(customers.id, id));
     return customer!;
@@ -90,6 +94,8 @@ export async function updateCustomer(
     phone: string | null;
     address: string | null;
     note: string | null;
+    consentGivenAt: Date | null;
+    consentSource: string | null;
   }>,
 ) {
   return withTenantSchema(schemaName, async (db) => {

@@ -15,6 +15,8 @@ export default async function customersRoutes(app: FastifyInstance) {
       phone?: string;
       address?: string;
       note?: string;
+      consentGivenAt?: string;
+      consentSource?: string;
     };
   }>(
     '/',
@@ -34,6 +36,11 @@ export default async function customersRoutes(app: FastifyInstance) {
             phone: { type: 'string' },
             address: { type: 'string' },
             note: { type: 'string' },
+            consentGivenAt: { type: 'string', format: 'date-time',
+              description: 'NDPR: ISO 8601 timestamp when customer consented to data collection' },
+            consentSource: { type: 'string',
+              enum: ['pos_signup', 'whatsapp_chat', 'web_checkout', 'manual'],
+              description: 'NDPR: how consent was obtained' },
           },
           additionalProperties: false,
         },
@@ -104,6 +111,8 @@ export default async function customersRoutes(app: FastifyInstance) {
       phone: string | null;
       address: string | null;
       note: string | null;
+      consentGivenAt: string | null;
+      consentSource: string | null;
     }>;
   }>(
     '/:id',
@@ -127,17 +136,21 @@ export default async function customersRoutes(app: FastifyInstance) {
             phone: { type: ['string', 'null'] },
             address: { type: ['string', 'null'] },
             note: { type: ['string', 'null'] },
+            consentGivenAt: { type: ['string', 'null'], format: 'date-time' },
+            consentSource: { type: ['string', 'null'], enum: ['pos_signup', 'whatsapp_chat', 'web_checkout', 'manual', null] },
           },
           additionalProperties: false,
         },
       },
     },
     async (request) => {
-      const customer = await updateCustomer(
-        request.tenant.schema,
-        request.params.id,
-        request.body,
-      );
+      const { consentGivenAt, ...rest } = request.body;
+      const customer = await updateCustomer(request.tenant.schema, request.params.id, {
+        ...rest,
+        ...(consentGivenAt !== undefined && {
+          consentGivenAt: consentGivenAt ? new Date(consentGivenAt) : null,
+        }),
+      });
       return { success: true, data: customer };
     },
   );

@@ -6,6 +6,7 @@ import { errorHandler } from './shared/errors/handler.js';
 import { registerRequestId } from './shared/middleware/request-id.js';
 
 // Plugins
+import helmetPlugin from './plugins/helmet.js';
 import corsPlugin from './plugins/cors.js';
 import swaggerPlugin from './plugins/swagger.js';
 import rateLimitPlugin from './plugins/rate-limit.js';
@@ -27,6 +28,7 @@ import expensesRoutes from './modules/expenses/routes.js';
 import reportingRoutes from './modules/reporting/routes.js';
 import invoicingRoutes from './modules/invoicing/routes.js';
 import whatsappRoutes from './modules/whatsapp/routes.js';
+import onboardingRoutes from './modules/onboarding/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -56,6 +58,7 @@ export function buildApp() {
   app.setErrorHandler(errorHandler);
 
   // Core plugins (order matters)
+  void app.register(fp(helmetPlugin));
   void app.register(fp(corsPlugin));
   void app.register(fp(rateLimitPlugin));
   void app.register(fp(swaggerPlugin));
@@ -90,6 +93,7 @@ export function buildApp() {
   void app.register(reportingRoutes,    { prefix: '/v1/reports' });
   void app.register(invoicingRoutes,    { prefix: '/v1/invoices' });
   void app.register(whatsappRoutes,    { prefix: '/v1/whatsapp' });
+  void app.register(onboardingRoutes,  { prefix: '/v1/onboarding' });
 
   return app;
 }

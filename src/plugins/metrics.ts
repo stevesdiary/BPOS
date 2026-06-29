@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
 import { collectDefaultMetrics, Registry, Counter, Histogram } from 'prom-client';
+import { env } from '../config/env.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -50,7 +51,15 @@ async function metricsPlugin(app: FastifyInstance) {
     httpRequestTotal.inc(labels);
   });
 
-  app.get('/metrics', { schema: { hide: true } }, async (_request, reply) => {
+  app.get('/metrics', { schema: { hide: true } }, async (request, reply) => {
+    // In production, restrict to loopback; in dev/test, open for scraping
+    if (env.NODE_ENV === 'production') {
+      const ip = request.ip;
+      const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+      if (!isLoopback) {
+        return reply.code(403).send({ error: 'Forbidden' });
+      }
+    }
     const metrics = await registry.metrics();
     return reply
       .header('Content-Type', registry.contentType)

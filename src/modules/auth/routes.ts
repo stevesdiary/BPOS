@@ -35,6 +35,9 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { tenantSlug: string; email: string; password: string } }>(
     '/login',
     {
+      config: {
+        rateLimit: { max: 10, timeWindow: '1 minute' },
+      },
       schema: {
         tags: ['Auth'],
         summary: 'Authenticate a user and receive tokens',
@@ -87,6 +90,9 @@ export default async function authRoutes(app: FastifyInstance) {
   app.post<{ Body: { tenantSlug: string; refreshToken: string } }>(
     '/refresh',
     {
+      config: {
+        rateLimit: { max: 20, timeWindow: '1 minute' },
+      },
       schema: {
         tags: ['Auth'],
         summary: 'Exchange a refresh token for a new access token',

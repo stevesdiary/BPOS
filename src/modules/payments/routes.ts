@@ -3,6 +3,7 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { paystackGateway } from '../../shared/payments/paystack.js';
+import { flutterwaveGateway } from '../../shared/payments/flutterwave.js';
 import { initiatePayment, handlePaystackWebhook } from './service.js';
 import type { PaystackWebhookData } from './service.js';
 import { handleSubscriptionBillingWebhook } from '../subscriptions/service.js';
@@ -122,6 +123,48 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
           ).catch(() => {});
         } else {
           await handlePaystackWebhook(schemaName, payload.event, payload.data);
+        }
+
+        return reply.send({ success: true });
+      },
+    );
+
+    // ─── POST /payments/webhook/flutterwave ─────────────────────────────────
+    scope.post(
+      '/webhook/flutterwave',
+      {
+        schema: {
+          tags: ['Payments'],
+          summary: 'Flutterwave webhook receiver',
+          description: 'Receives Flutterwave charge.completed events. Validates verif-hash header.',
+        },
+      },
+      async (request, reply) => {
+        const rawBody = (request as unknown as WebhookRequest).rawBody ?? '';
+        const signature = (request.headers['verif-hash'] as string | undefined) ?? '';
+
+        if (!flutterwaveGateway.validateWebhookSignature(rawBody, signature)) {
+          return reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid webhook signature' } });
+        }
+
+        const payload = request.body as { event: string; data: { txRef?: string; tx_ref?: string; metadata?: Record<string, unknown>; id?: number; status?: string; amount?: number; app_fee?: number; flw_ref?: string; created_at?: string } };
+
+        const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
+        const schemaName = (meta['schemaName'] as string | undefined) ?? '';
+        if (!schemaName) return reply.send({ success: true });
+
+        // Normalise Flutterwave event → shared handler
+        // charge.completed → charge.success; other events silently acknowledged
+        if (payload.event === 'charge.completed' && payload.data?.status === 'successful') {
+          const reference = payload.data.txRef ?? payload.data.tx_ref ?? '';
+          await handlePaystackWebhook(schemaName, 'charge.success', {
+            id: payload.data.id ?? 0,
+            reference,
+            amount: Math.round((payload.data.amount ?? 0) * 100),  // NGN → kobo
+            fees: Math.round((payload.data.app_fee ?? 0) * 100),
+            status: 'success',
+            metadata: meta as { orderId?: string; schemaName?: string },
+          });
         }
 
         return reply.send({ success: true });

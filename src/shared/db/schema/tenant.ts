@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   index,
   numeric,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@ export const orderStatusEnum = pgEnum('order_status', [
   'confirmed',
   'processing',
   'fulfilled',
+  'dispatched',
   'cancelled',
   'refunded',
 ]);
@@ -49,6 +51,15 @@ export const stockMovementTypeEnum = pgEnum('stock_movement_type', [
 ]);
 
 export const ledgerEntryTypeEnum = pgEnum('ledger_entry_type', ['debit', 'credit']);
+
+export const dispatchStatusEnum = pgEnum('dispatch_status', [
+  'pending',
+  'dispatched',
+  'in_transit',
+  'delivered',
+  'failed',
+  'returned',
+]);
 
 // ─── Staff / Users ────────────────────────────────────────────────────────────
 
@@ -232,6 +243,15 @@ export const orders = pgTable(
     paymentStatus: paymentStatusEnum('payment_status').notNull().default('pending'),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    // Logistics / dispatch fields
+    deliveryAddress: text('delivery_address'),
+    deliveryFeeKobo: integer('delivery_fee_kobo').notNull().default(0),
+    logisticsProvider: text('logistics_provider'),
+    logisticsReference: text('logistics_reference'),
+    trackingNumber: text('tracking_number'),
+    estimatedDeliveryAt: timestamp('estimated_delivery_at', { withTimezone: true }),
+    dispatchedAt: timestamp('dispatched_at', { withTimezone: true }),
+    dispatchStatus: dispatchStatusEnum('dispatch_status').default('pending'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -407,6 +427,27 @@ export const invoices = pgTable(
   }),
 );
 
+// ─── Logistics Events ─────────────────────────────────────────────────────────
+
+export const logisticsEvents = pgTable(
+  'logistics_events',
+  {
+    id: text('id').primaryKey(),
+    orderId: text('order_id')
+      .notNull()
+      .references(() => orders.id),
+    eventType: text('event_type').notNull(),
+    eventData: jsonb('event_data'),
+    eventId: text('event_id').notNull(), // provider idempotency key
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    orderIdx: index('logistics_events_order_idx').on(table.orderId),
+    eventIdIdx: uniqueIndex('logistics_events_event_id_idx').on(table.eventId),
+  }),
+);
+
 // ─── Infer types ──────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -430,3 +471,4 @@ export type JournalLine = typeof journalLines.$inferSelect;
 export type Subscription = typeof subscriptions.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
+export type LogisticsEvent = typeof logisticsEvents.$inferSelect;

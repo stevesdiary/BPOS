@@ -8,6 +8,7 @@
 //   5100  Payment Processing Fees (expense)
 //   5200  Operating Expenses      (expense)
 //   5300  Refunds                 (expense)
+//   5400  Logistics Costs         (expense)
 
 export interface JournalLine {
   accountCode: string;
@@ -99,6 +100,42 @@ export function expenseRecordedTemplate(
     referenceId: expenseId,
     referenceType: 'expense',
     description,
+    lines,
+  };
+}
+
+// When a delivery fee is collected from the customer (revenue for the merchant).
+export function deliveryFeeCollectedTemplate(
+  orderId: string,
+  feeKobo: number,
+): JournalEntryDraft {
+  const lines: JournalLine[] = [
+    { accountCode: '1000', type: 'debit', amountKobo: feeKobo },   // Cash ↑
+    { accountCode: '4000', type: 'credit', amountKobo: feeKobo },  // Revenue ↑
+  ];
+  assertBalanced(lines);
+  return {
+    referenceId: orderId,
+    referenceType: 'delivery_fee',
+    description: `Delivery fee collected for order ${orderId}`,
+    lines,
+  };
+}
+
+// When the merchant pays the logistics provider for dispatch.
+export function logisticsCostTemplate(
+  orderId: string,
+  costKobo: number,
+): JournalEntryDraft {
+  const lines: JournalLine[] = [
+    { accountCode: '5400', type: 'debit', amountKobo: costKobo },   // Logistics cost ↑
+    { accountCode: '1000', type: 'credit', amountKobo: costKobo },  // Cash ↓
+  ];
+  assertBalanced(lines);
+  return {
+    referenceId: orderId,
+    referenceType: 'logistics_cost',
+    description: `Logistics dispatch cost for order ${orderId}`,
     lines,
   };
 }

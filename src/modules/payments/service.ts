@@ -6,7 +6,7 @@ import {
   orders,
 } from '../../shared/db/schema/tenant.js';
 import { NotFoundError, ValidationError } from '../../shared/errors/types.js';
-import { paystackGateway } from '../../shared/payments/paystack.js';
+import { getGateway } from '../../shared/payments/index.js';
 import { postJournalEntry } from '../ledger/service.js';
 import {
   orderPaidTemplate,
@@ -39,7 +39,7 @@ export async function initiatePayment(
   const reference = `bpos-${uuidv4()}`;
   const callbackUrl = `${env.PLATFORM_BASE_URL}/v1/payments/verify/${reference}`;
 
-  const result = await paystackGateway.initiatePayment({
+  const result = await getGateway().initiatePayment({
     email: customerEmail,
     amountKobo: order.totalKobo,
     reference,
@@ -51,7 +51,7 @@ export async function initiatePayment(
     await db.insert(payments).values({
       id: uuidv4(),
       orderId,
-      gateway: 'paystack',
+      gateway: getGateway().name as 'paystack' | 'flutterwave' | 'manual',
       gatewayReference: reference,
       amountKobo: order.totalKobo,
       status: 'initiated',

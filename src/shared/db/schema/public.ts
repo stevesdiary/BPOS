@@ -11,6 +11,7 @@ import {
   pgEnum,
   uniqueIndex,
   index,
+  jsonb,
 } from 'drizzle-orm/pg-core';
 
 export const planTierEnum = pgEnum('plan_tier', ['trial', 'entry', 'growth', 'enterprise']);
@@ -65,7 +66,32 @@ export const refreshTokens = pgTable(
   }),
 );
 
+export const tenantIntegrations = pgTable(
+  'tenant_integrations',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    integrationType: text('integration_type').notNull(), // 'logistics'
+    providerName: text('provider_name').notNull(),       // 'sendstack', 'gig', 'dhl', etc.
+    apiKeyEncrypted: text('api_key_encrypted').notNull(), // AES-256-GCM, base64
+    config: jsonb('config'),                              // baseUrl, webhookSecret, etc.
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    tenantTypeIdx: uniqueIndex('tenant_integrations_tenant_type_idx').on(
+      table.tenantId,
+      table.integrationType,
+    ),
+  }),
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
 export type NewRefreshToken = typeof refreshTokens.$inferInsert;
+export type TenantIntegration = typeof tenantIntegrations.$inferSelect;
+export type NewTenantIntegration = typeof tenantIntegrations.$inferInsert;

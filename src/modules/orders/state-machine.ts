@@ -5,13 +5,15 @@ export type OrderStatus =
   | 'confirmed'
   | 'processing'
   | 'fulfilled'
+  | 'dispatched'
   | 'cancelled'
   | 'refunded';
 
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   draft: ['confirmed', 'cancelled'],
   confirmed: ['processing', 'cancelled'],
-  processing: ['fulfilled', 'cancelled'],
+  processing: ['fulfilled', 'dispatched', 'cancelled'],
+  dispatched: ['fulfilled', 'cancelled'],
   fulfilled: ['refunded'],
   cancelled: [],
   refunded: [],

@@ -27,7 +27,8 @@ export type FeatureKey =
   | 'locations:manage'
   | 'whatsapp:ordering'
   | 'subscriptions:manage'
-  | 'pos:use';
+  | 'pos:use'
+  | 'logistics:dispatch';
 
 export interface FeatureLimit {
   allowed: boolean;
@@ -59,6 +60,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'whatsapp:ordering': { allowed: false },
     'subscriptions:manage': { allowed: true },
     'pos:use': { allowed: true },
+    'logistics:dispatch': { allowed: false },
   },
   entry: {
     'orders:create': { allowed: true },
@@ -82,6 +84,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'whatsapp:ordering': { allowed: false },
     'subscriptions:manage': { allowed: true },
     'pos:use': { allowed: true },
+    'logistics:dispatch': { allowed: false },
   },
   growth: {
     'orders:create': { allowed: true },
@@ -105,6 +108,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'whatsapp:ordering': { allowed: true },
     'subscriptions:manage': { allowed: true },
     'pos:use': { allowed: true },
+    'logistics:dispatch': { allowed: true },
   },
   enterprise: {
     'orders:create': { allowed: true },
@@ -128,6 +132,7 @@ export const PLAN_ENTITLEMENTS: Record<PlanTier, PlanEntitlements> = {
     'whatsapp:ordering': { allowed: true },
     'subscriptions:manage': { allowed: true },
     'pos:use': { allowed: true },
+    'logistics:dispatch': { allowed: true },
   },
 };
 

@@ -47,6 +47,7 @@ async function swaggerPlugin(app: FastifyInstance) {
         { name: 'Ledger', description: 'Double-entry financial ledger' },
         { name: 'Subscriptions', description: 'Plan subscriptions and feature gating' },
         { name: 'Reporting', description: 'P&L and operational reports' },
+        { name: 'Uploads', description: 'Image upload and compression' },
       ],
     },
   });

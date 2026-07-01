@@ -53,6 +53,9 @@ const envSchema = z.object({
 
   // Feature flags
   SWAGGER_ENABLED: z.coerce.boolean().default(true),
+
+  // Uploads
+  MAX_UPLOAD_SIZE_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024), // 10MB raw cap pre-compression
 });
 
 function parseEnv() {

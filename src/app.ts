@@ -11,6 +11,7 @@ import corsPlugin from './plugins/cors.js';
 import swaggerPlugin from './plugins/swagger.js';
 import rateLimitPlugin from './plugins/rate-limit.js';
 import metricsPlugin from './plugins/metrics.js';
+import multipartPlugin from './plugins/multipart.js';
 
 // Module routes
 import authRoutes from './modules/auth/routes.js';
@@ -30,6 +31,7 @@ import invoicingRoutes from './modules/invoicing/routes.js';
 import whatsappRoutes from './modules/whatsapp/routes.js';
 import onboardingRoutes from './modules/onboarding/routes.js';
 import dispatchRoutes from './modules/dispatch/routes.js';
+import uploadsRoutes from './modules/uploads/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -64,6 +66,7 @@ export function buildApp() {
   void app.register(fp(rateLimitPlugin));
   void app.register(fp(swaggerPlugin));
   void app.register(fp(metricsPlugin));
+  void app.register(fp(multipartPlugin));
   void app.register(jwtPlugin, {
     secret: env.JWT_ACCESS_SECRET,
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
@@ -96,6 +99,7 @@ export function buildApp() {
   void app.register(whatsappRoutes,    { prefix: '/v1/whatsapp' });
   void app.register(onboardingRoutes,  { prefix: '/v1/onboarding' });
   void app.register(dispatchRoutes,    { prefix: '/v1/dispatch' });
+  void app.register(uploadsRoutes,     { prefix: '/v1/uploads' });
 
   return app;
 }

@@ -21,6 +21,7 @@ export const QUEUES = {
   DOCUMENTS: 'documents',
   PAYMENTS: 'payments',
   SUBSCRIPTIONS: 'subscriptions',
+  LOGISTICS: 'logistics',
 } as const;
 
 // Typed queue factory
@@ -49,3 +50,4 @@ export const notificationsQueue = createQueue<unknown>(QUEUES.NOTIFICATIONS);
 export const documentsQueue = createQueue<unknown>(QUEUES.DOCUMENTS);
 export const paymentsQueue = createQueue<unknown>(QUEUES.PAYMENTS);
 export const subscriptionsQueue = createQueue<unknown>(QUEUES.SUBSCRIPTIONS);
+export const logisticsQueue = createQueue<unknown>(QUEUES.LOGISTICS);

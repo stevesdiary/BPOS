@@ -44,6 +44,9 @@ const envSchema = z.object({
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_APP_SECRET: z.string().optional(),
 
+  // Logistics (optional — enables dispatch module when set)
+  PLATFORM_ENCRYPTION_KEY: z.string().min(64).optional(), // 32-byte hex = 64 hex chars
+
   // Platform
   PLATFORM_BASE_URL: z.string().url().default('http://localhost:3000'),
   CORS_ORIGINS: z.string().default('http://localhost:3001,http://localhost:3002'),

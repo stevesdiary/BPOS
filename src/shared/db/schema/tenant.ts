@@ -15,6 +15,7 @@ import {
   index,
   numeric,
   jsonb,
+  real,
 } from 'drizzle-orm/pg-core';
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
@@ -142,6 +143,7 @@ export const productVariants = pgTable(
     // null = no tax / inherit from business default. Only visible to manager+.
     taxRateBps: integer('tax_rate_bps'),
     attributes: text('attributes'), // JSON string: { color: 'red', size: 'M' }
+    weightKg: real('weight_kg'), // optional — required for weight-based shipping rates
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -243,6 +245,14 @@ export const orders = pgTable(
     paymentStatus: paymentStatusEnum('payment_status').notNull().default('pending'),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    // Shipping
+    shippingMethodId: text('shipping_method_id'), // FK resolved at app layer (circular ref avoidance)
+    pickupLocationId: text('pickup_location_id'), // FK resolved at app layer
+    destinationState: text('destination_state'), // Nigerian state name — used for zone-based rate lookup
+    // When a free-shipping method is used, deliveryFeeKobo = 0 (customer pays nothing).
+    // merchantShippingCostKobo records what the merchant actually pays the courier.
+    // This is sourced from shippingMethods.merchantCostKobo at order creation time.
+    merchantShippingCostKobo: integer('merchant_shipping_cost_kobo').notNull().default(0),
     // Logistics / dispatch fields
     deliveryAddress: text('delivery_address'),
     deliveryFeeKobo: integer('delivery_fee_kobo').notNull().default(0),
@@ -448,6 +458,145 @@ export const logisticsEvents = pgTable(
   }),
 );
 
+// ─── Shipping ─────────────────────────────────────────────────────────────────
+
+export const shippingMethodTypeEnum = pgEnum('shipping_method_type', [
+  'flat_rate',
+  'zone_rate',
+  'value_rate',
+  'weight_rate',
+  'automated',
+  'free',
+  'pick_up',
+]);
+
+export const freeShippingConditionTypeEnum = pgEnum('free_shipping_condition_type', [
+  'always',
+  'min_order_value',
+  'product',
+  'category',
+  'promo_code',
+]);
+
+export const pickupLocationTypeEnum = pgEnum('pickup_location_type', [
+  'merchant_branch',
+  'third_party',
+]);
+
+// Merchant-defined zones: a named group of Nigerian states.
+// e.g. { name: 'Lagos', states: ['Lagos'] }
+// e.g. { name: 'South West', states: ['Lagos', 'Ogun', 'Oyo', 'Osun', 'Ekiti', 'Ondo'] }
+export const shippingZones = pgTable('shipping_zones', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  states: jsonb('states').notNull(), // string[] — list of Nigerian state names in this zone
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A merchant-configured shipping option presented at checkout.
+export const shippingMethods = pgTable(
+  'shipping_methods',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(), // e.g. "Standard Delivery", "Express", "Pick Up"
+    type: shippingMethodTypeEnum('type').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    description: text('description'),
+    estimatedDaysMin: integer('estimated_days_min'), // e.g. 1 — for display only
+    estimatedDaysMax: integer('estimated_days_max'), // e.g. 3
+    // flat_rate only: static fee charged to the customer
+    flatRateKobo: integer('flat_rate_kobo'),
+    // free method: isFreeAlways = true means customer is charged ₦0.
+    // The merchant still pays the courier — that cost is tracked via merchantCostKobo.
+    isFreeAlways: boolean('is_free_always').notNull().default(false),
+    // The merchant's actual cost per delivery when offering free shipping to customers.
+    // Populated from this field onto orders.merchantShippingCostKobo at order creation.
+    // Used for cost analysis and expense reporting. Does not affect what the customer pays.
+    merchantCostKobo: integer('merchant_cost_kobo'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    activeIdx: index('shipping_methods_active_idx').on(table.isActive),
+    typeIdx: index('shipping_methods_type_idx').on(table.type),
+  }),
+);
+
+// Rate rows for zone_rate, value_rate, and weight_rate methods.
+// Each row belongs to one method and defines fee for a specific range/zone.
+export const shippingRates = pgTable(
+  'shipping_rates',
+  {
+    id: text('id').primaryKey(),
+    methodId: text('method_id')
+      .notNull()
+      .references(() => shippingMethods.id, { onDelete: 'cascade' }),
+    // For zone_rate: which zone this rate applies to.
+    // null on a zone_rate method = fallback/catch-all rate for unmatched states.
+    zoneId: text('zone_id').references(() => shippingZones.id, { onDelete: 'set null' }),
+    // For value_rate: order value range (kobo). null max = no upper bound.
+    minOrderValueKobo: integer('min_order_value_kobo'),
+    maxOrderValueKobo: integer('max_order_value_kobo'),
+    // For weight_rate: weight range (kg). null max = no upper bound.
+    minWeightKg: real('min_weight_kg'),
+    maxWeightKg: real('max_weight_kg'),
+    feeKobo: integer('fee_kobo').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    methodIdx: index('shipping_rates_method_idx').on(table.methodId),
+  }),
+);
+
+// Conditions that make a 'free' shipping method available.
+// A free method with no rows and isFreeAlways=false will never appear at checkout.
+export const freeShippingConditions = pgTable(
+  'free_shipping_conditions',
+  {
+    id: text('id').primaryKey(),
+    methodId: text('method_id')
+      .notNull()
+      .references(() => shippingMethods.id, { onDelete: 'cascade' }),
+    conditionType: freeShippingConditionTypeEnum('condition_type').notNull(),
+    thresholdKobo: integer('threshold_kobo'), // for min_order_value
+    productId: text('product_id'), // for product type
+    categoryId: text('category_id'), // for category type
+    promoCode: text('promo_code'), // for promo_code type
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    methodIdx: index('free_shipping_conditions_method_idx').on(table.methodId),
+    promoCodeIdx: index('free_shipping_conditions_promo_idx').on(table.promoCode),
+  }),
+);
+
+// Unified pick-up locations: merchant's own branches OR third-party collection points.
+export const pickupLocations = pgTable(
+  'pickup_locations',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    locationType: pickupLocationTypeEnum('location_type').notNull(),
+    // merchant_branch — references the existing locations table
+    locationId: text('location_id'), // FK to locations.id, set when locationType='merchant_branch'
+    // third_party — logistics provider's collection point
+    providerName: text('provider_name'), // 'gig' | 'dhl' | 'kwik' | etc.
+    address: text('address').notNull(),
+    state: text('state'), // Nigerian state for filtering / display
+    phone: text('phone'),
+    operatingHours: text('operating_hours'), // free-text e.g. "Mon–Fri 9am–5pm"
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    activeIdx: index('pickup_locations_active_idx').on(table.isActive),
+    typeIdx: index('pickup_locations_type_idx').on(table.locationType),
+    stateIdx: index('pickup_locations_state_idx').on(table.state),
+  }),
+);
+
 // ─── Infer types ──────────────────────────────────────────────────────────────
 
 export type User = typeof users.$inferSelect;
@@ -472,3 +621,8 @@ export type Subscription = typeof subscriptions.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type Invoice = typeof invoices.$inferSelect;
 export type LogisticsEvent = typeof logisticsEvents.$inferSelect;
+export type ShippingZone = typeof shippingZones.$inferSelect;
+export type ShippingMethod = typeof shippingMethods.$inferSelect;
+export type ShippingRate = typeof shippingRates.$inferSelect;
+export type FreeShippingCondition = typeof freeShippingConditions.$inferSelect;
+export type PickupLocation = typeof pickupLocations.$inferSelect;

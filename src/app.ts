@@ -32,6 +32,7 @@ import whatsappRoutes from './modules/whatsapp/routes.js';
 import onboardingRoutes from './modules/onboarding/routes.js';
 import dispatchRoutes from './modules/dispatch/routes.js';
 import uploadsRoutes from './modules/uploads/routes.js';
+import shippingRoutes from './modules/shipping/routes.js';
 
 export function buildApp() {
   const app = Fastify({
@@ -100,6 +101,7 @@ export function buildApp() {
   void app.register(onboardingRoutes,  { prefix: '/v1/onboarding' });
   void app.register(dispatchRoutes,    { prefix: '/v1/dispatch' });
   void app.register(uploadsRoutes,     { prefix: '/v1/uploads' });
+  void app.register(shippingRoutes,   { prefix: '/v1/shipping' });
 
   return app;
 }

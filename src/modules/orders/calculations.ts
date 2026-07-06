@@ -27,6 +27,7 @@ export function calculateOrderTotals(
   lines: LineInput[],
   orderDiscountKobo = 0,
   orderTaxKobo = 0,
+  deliveryFeeKobo = 0,
 ): OrderTotals {
   const lineTotalsKobo = lines.map((line) =>
     Math.max(
@@ -35,6 +36,6 @@ export function calculateOrderTotals(
     ),
   );
   const subtotalKobo = lineTotalsKobo.reduce((sum, t) => sum + t, 0);
-  const totalKobo = Math.max(0, subtotalKobo - orderDiscountKobo + orderTaxKobo);
+  const totalKobo = Math.max(0, subtotalKobo - orderDiscountKobo + orderTaxKobo + deliveryFeeKobo);
   return { subtotalKobo, totalKobo, lineTotalsKobo };
 }

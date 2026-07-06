@@ -9,6 +9,8 @@ import {
   productVariants,
   products,
   users,
+  inventory,
+  locations,
 } from '../../shared/db/schema/tenant.js';
 
 // ─── P&L report ───────────────────────────────────────────────────────────────
@@ -219,6 +221,49 @@ export async function getStaffSalesReport(
       lastName: r.lastName,
       orderCount: parseInt(r.orderCount ?? '0'),
       totalRevenueKobo: parseInt(r.totalRevenueKobo ?? '0'),
+    }));
+  });
+}
+
+// ─── Inventory valuation ──────────────────────────────────────────────────────
+
+export interface InventoryValuationRow {
+  variantId: string;
+  sku: string;
+  productName: string;
+  variantName: string;
+  locationId: string;
+  locationName: string | null;
+  quantityOnHand: number;
+  unitCostKobo: number;
+  totalValueKobo: number;
+}
+
+export async function getInventoryValuation(
+  schemaName: string,
+): Promise<InventoryValuationRow[]> {
+  return withTenantSchema(schemaName, async (db) => {
+    const rows = await db
+      .select({
+        variantId: productVariants.id,
+        sku: productVariants.sku,
+        productName: products.name,
+        variantName: productVariants.name,
+        locationId: inventory.locationId,
+        locationName: locations.name,
+        quantityOnHand: inventory.quantityOnHand,
+        unitCostKobo: productVariants.costKobo,
+      })
+      .from(inventory)
+      .innerJoin(productVariants, eq(inventory.variantId, productVariants.id))
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .leftJoin(locations, eq(inventory.locationId, locations.id))
+      .orderBy(products.name, productVariants.name, locations.name);
+
+    return rows.map((r) => ({
+      ...r,
+      locationName: r.locationName ?? null,
+      totalValueKobo: r.quantityOnHand * r.unitCostKobo,
     }));
   });
 }

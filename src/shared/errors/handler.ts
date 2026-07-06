@@ -1,5 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from './types.js';
+import { notifySlackError } from '../alerts/slack.js';
 
 export function errorHandler(
   error: FastifyError | Error,
@@ -10,6 +11,17 @@ export function errorHandler(
 
   if (error instanceof AppError) {
     logger.warn({ err: error, code: error.code }, error.message);
+    if (error.statusCode >= 500) {
+      notifySlackError({
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        method: request.method,
+        url: request.url,
+        requestId: request.id,
+        ...(error.stack !== undefined ? { stack: error.stack } : {}),
+      });
+    }
     return reply.status(error.statusCode).send({
       success: false,
       error: {
@@ -35,6 +47,14 @@ export function errorHandler(
   }
 
   logger.error({ err: error }, 'Unhandled error');
+  notifySlackError({
+    message: error.message,
+    statusCode: 500,
+    method: request.method,
+    url: request.url,
+    requestId: request.id,
+    ...(error.stack !== undefined ? { stack: error.stack } : {}),
+  });
   return reply.status(500).send({
     success: false,
     error: {

@@ -7,6 +7,7 @@ import {
   inventory,
   stockMovements,
   productVariants,
+  shippingMethods,
 } from '../../shared/db/schema/tenant.js';
 import type { Order } from '../../shared/db/schema/tenant.js';
 import { NotFoundError, ValidationError } from '../../shared/errors/types.js';
@@ -35,6 +36,15 @@ export interface CreateOrderInput {
   discountKobo?: number;
   taxKobo?: number;
   note?: string;
+  // Shipping
+  shippingMethodId?: string;
+  pickupLocationId?: string;
+  deliveryAddress?: string;
+  destinationState?: string;
+  deliveryFeeKobo?: number;
+  // Auto-populated from shippingMethods.merchantCostKobo when a free method is used.
+  // Caller may also override explicitly (e.g. from a live provider quote at dispatch).
+  merchantShippingCostKobo?: number;
 }
 
 export async function createOrder(
@@ -71,7 +81,22 @@ export async function createOrder(
       itemsWithTax,
       input.discountKobo,
       input.taxKobo,
+      input.deliveryFeeKobo,
     );
+
+    // When a free shipping method is used, the customer pays ₦0 but the merchant
+    // still owes the courier. Resolve that cost from the method record if not overridden.
+    let merchantShippingCostKobo = input.merchantShippingCostKobo ?? 0;
+    if (!merchantShippingCostKobo && input.shippingMethodId) {
+      const [method] = await db
+        .select({ type: shippingMethods.type, merchantCostKobo: shippingMethods.merchantCostKobo })
+        .from(shippingMethods)
+        .where(eq(shippingMethods.id, input.shippingMethodId))
+        .limit(1);
+      if (method?.type === 'free' && method.merchantCostKobo) {
+        merchantShippingCostKobo = method.merchantCostKobo;
+      }
+    }
 
     const orderId = uuidv4();
 
@@ -87,6 +112,12 @@ export async function createOrder(
       taxKobo: input.taxKobo ?? 0,
       totalKobo,
       note: input.note ?? null,
+      shippingMethodId: input.shippingMethodId ?? null,
+      pickupLocationId: input.pickupLocationId ?? null,
+      deliveryAddress: input.deliveryAddress ?? null,
+      destinationState: input.destinationState ?? null,
+      deliveryFeeKobo: input.deliveryFeeKobo ?? 0,
+      merchantShippingCostKobo,
     });
 
     await db.insert(orderItems).values(

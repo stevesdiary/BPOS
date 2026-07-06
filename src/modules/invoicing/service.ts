@@ -5,6 +5,19 @@ import { invoices, orders, orderItems, productVariants } from '../../shared/db/s
 import { NotFoundError } from '../../shared/errors/types.js';
 import { documentsQueue } from '../../shared/queue/client.js';
 
+export async function updateInvoicePdf(
+  schemaName: string,
+  invoiceId: string,
+  pdfUrl: string,
+): Promise<void> {
+  await withTenantSchema(schemaName, async (db) => {
+    await db
+      .update(invoices)
+      .set({ pdfUrl, status: 'sent' })
+      .where(eq(invoices.id, invoiceId));
+  });
+}
+
 export interface GenerateInvoiceJobData {
   tenantId: string;
   schemaName: string;

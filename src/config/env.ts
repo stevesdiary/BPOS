@@ -56,6 +56,13 @@ const envSchema = z.object({
 
   // Uploads
   MAX_UPLOAD_SIZE_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024), // 10MB raw cap pre-compression
+
+  // Alerting (optional — Slack notifications for server errors)
+  SLACK_WEBHOOK_URL: z.string().url().optional(),
+
+  // Email (optional — invoice delivery via Resend; emails skipped when not set)
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().email().optional(),
 });
 
 function parseEnv() {

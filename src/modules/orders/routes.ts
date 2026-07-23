@@ -3,15 +3,9 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { requireManager } from '../../shared/middleware/auth.js';
-import {
-  createOrder,
-  listOrders,
-  getOrder,
-  confirmOrder,
-  processOrder,
-  fulfillOrder,
-  cancelOrder,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const readGuard = [requireAuth, resolveTenant, requireFeature('orders:create')];
 const managerGuard = [requireAuth, resolveTenant, requireManager, requireFeature('orders:create')];
@@ -83,12 +77,9 @@ export default async function ordersRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const order = await createOrder(
-        request.tenant.schema,
-        request.user.userId,
-        request.body,
-      );
-      return reply.status(201).send({ success: true, data: order });
+      const ctx = createContext(request);
+      const order = await controller.create(ctx, request.body);
+      sendCreated(reply, order);
     },
   );
 
@@ -127,17 +118,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const q = request.query;
-      const result = await listOrders(request.tenant.schema, {
-        ...(q.page && { page: parseInt(q.page) }),
-        ...(q.limit && { limit: parseInt(q.limit) }),
-        ...(q.status && { status: q.status }),
-        ...(q.channel && { channel: q.channel }),
-        ...(q.from && { from: q.from }),
-        ...(q.to && { to: q.to }),
-      });
-      return { success: true, data: result };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const result = await controller.list(ctx, request.query);
+      sendSuccess(reply, result);
     },
   );
 
@@ -158,9 +142,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const order = await getOrder(request.tenant.schema, request.params.id);
-      return { success: true, data: order };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const order = await controller.get(ctx, request.params.id);
+      sendSuccess(reply, order);
     },
   );
 
@@ -181,14 +166,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const order = await confirmOrder(
-        request.tenant.schema,
-        request.tenant.tenantId,
-        request.params.id,
-        request.user.userId,
-      );
-      return { success: true, data: order };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const order = await controller.confirm(ctx, request.params.id);
+      sendSuccess(reply, order);
     },
   );
 
@@ -207,9 +188,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const order = await processOrder(request.tenant.schema, request.params.id);
-      return { success: true, data: order };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const order = await controller.process(ctx, request.params.id);
+      sendSuccess(reply, order);
     },
   );
 
@@ -228,9 +210,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const order = await fulfillOrder(request.tenant.schema, request.params.id);
-      return { success: true, data: order };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const order = await controller.fulfil(ctx, request.params.id);
+      sendSuccess(reply, order);
     },
   );
 
@@ -249,13 +232,10 @@ export default async function ordersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const order = await cancelOrder(
-        request.tenant.schema,
-        request.params.id,
-        request.user.userId,
-      );
-      return { success: true, data: order };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const order = await controller.cancel(ctx, request.params.id);
+      sendSuccess(reply, order);
     },
   );
 }

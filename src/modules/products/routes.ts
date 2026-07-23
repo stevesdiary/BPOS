@@ -1,27 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
-import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { requireManager } from '../../shared/middleware/auth.js';
-import type { ProductVariant } from '../../shared/db/schema/tenant.js';
-
-// Strip cost price from variant responses for staff — they must not see margin data.
-// Managers, owners, and viewers retain full variant data.
-function sanitizeVariant(v: ProductVariant, hideMargin: boolean): Omit<ProductVariant, 'costKobo'> | ProductVariant {
-  if (!hideMargin) return v;
-  const { costKobo: _cost, ...safe } = v;
-  return safe;
-}
-import {
-  createCategory,
-  listCategories,
-  createProduct,
-  listProducts,
-  getProduct,
-  updateProduct,
-  createVariant,
-  updateVariant,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const managerGuard = [requireAuth, resolveTenant, requireManager];
 const readGuard = [requireAuth, resolveTenant];
@@ -49,9 +32,9 @@ export default async function productsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { schema } = request.tenant;
-      const category = await createCategory(schema, request.body);
-      return reply.status(201).send({ success: true, data: category });
+      const ctx = createContext(request);
+      const category = await controller.createCategoryHandler(ctx, request.body);
+      sendCreated(reply, category);
     },
   );
 
@@ -65,9 +48,10 @@ export default async function productsRoutes(app: FastifyInstance) {
         security: [{ bearerAuth: [] }],
       },
     },
-    async (request) => {
-      const cats = await listCategories(request.tenant.schema);
-      return { success: true, data: cats };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const cats = await controller.listCategoriesHandler(ctx);
+      sendSuccess(reply, cats);
     },
   );
 
@@ -102,8 +86,9 @@ export default async function productsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const product = await createProduct(request.tenant.schema, request.body);
-      return reply.status(201).send({ success: true, data: product });
+      const ctx = createContext(request);
+      const product = await controller.createProductHandler(ctx, request.body);
+      sendCreated(reply, product);
     },
   );
 
@@ -135,16 +120,10 @@ export default async function productsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const q = request.query;
-      const result = await listProducts(request.tenant.schema, {
-        ...(q.page && { page: parseInt(q.page) }),
-        ...(q.limit && { limit: parseInt(q.limit) }),
-        ...(q.categoryId && { categoryId: q.categoryId }),
-        ...(q.isActive !== undefined && { isActive: q.isActive === 'true' }),
-        ...(q.search && { search: q.search }),
-      });
-      return { success: true, data: result };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const result = await controller.listProductsHandler(ctx, request.query);
+      sendSuccess(reply, result);
     },
   );
 
@@ -163,16 +142,10 @@ export default async function productsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const product = await getProduct(request.tenant.schema, request.params.id);
-      const hideMargin = request.user.role === 'staff';
-      return {
-        success: true,
-        data: {
-          ...product,
-          variants: product.variants.map((v) => sanitizeVariant(v, hideMargin)),
-        },
-      };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const product = await controller.getProductHandler(ctx, request.params.id);
+      sendSuccess(reply, product);
     },
   );
 
@@ -211,13 +184,10 @@ export default async function productsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const product = await updateProduct(
-        request.tenant.schema,
-        request.params.id,
-        request.body,
-      );
-      return { success: true, data: product };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const product = await controller.updateProductHandler(ctx, request.params.id, request.body);
+      sendSuccess(reply, product);
     },
   );
 
@@ -263,12 +233,9 @@ export default async function productsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const variant = await createVariant(
-        request.tenant.schema,
-        request.params.id,
-        request.body,
-      );
-      return reply.status(201).send({ success: true, data: variant });
+      const ctx = createContext(request);
+      const variant = await controller.createVariantHandler(ctx, request.params.id, request.body);
+      sendCreated(reply, variant);
     },
   );
 
@@ -312,14 +279,15 @@ export default async function productsRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const variant = await updateVariant(
-        request.tenant.schema,
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const variant = await controller.updateVariantHandler(
+        ctx,
         request.params.id,
         request.params.vid,
         request.body,
       );
-      return { success: true, data: variant };
+      sendSuccess(reply, variant);
     },
   );
 }

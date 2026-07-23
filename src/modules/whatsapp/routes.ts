@@ -3,7 +3,10 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { env } from '../../config/env.js';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
-import { getTenantForPhoneId, registerPhoneIdTenant } from './session.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendMessage } from '../../shared/http/response.js';
+import * as controller from './controller.js';
+import { getTenantForPhoneId } from './session.js';
 import { handleInboundMessage } from './handler.js';
 
 interface RawBodyRequest extends FastifyRequest {
@@ -155,12 +158,9 @@ export default async function whatsappRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      await registerPhoneIdTenant(
-        request.body.phoneNumberId,
-        request.tenant.tenantId,
-        request.tenant.schema,
-      );
-      return reply.send({ success: true, message: 'Phone number ID registered' });
+      const ctx = createContext(request);
+      const result = await controller.setup(ctx, request.body);
+      sendMessage(reply, result.message);
     },
   );
 }

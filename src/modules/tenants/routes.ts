@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { createTenant } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const createTenantBody = {
   type: 'object',
@@ -55,14 +57,12 @@ export default async function tenantRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await createTenant(request.body);
-      return reply.status(201).send({
-        success: true,
-        data: {
-          tenantId: result.tenantId,
-          slug: result.slug,
-          message: 'Tenant provisioned successfully. Use your business email to log in.',
-        },
+      const ctx = createContext(request);
+      const result = await controller.create(ctx, request.body);
+      sendCreated(reply, {
+        tenantId: result.tenantId,
+        slug: result.slug,
+        message: 'Tenant provisioned successfully. Use your business email to log in.',
       });
     },
   );

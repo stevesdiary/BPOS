@@ -3,7 +3,9 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { ValidationError } from '../../shared/errors/types.js';
 import { env } from '../../config/env.js';
-import { uploadImage } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const guard = [requireAuth, resolveTenant];
 
@@ -38,12 +40,13 @@ export default async function uploadsRoutes(app: FastifyInstance) {
 
       const buffer = await file.toBuffer().catch(mapFileTooLarge);
 
-      const result = await uploadImage(request.tenant.schema, {
+      const ctx = createContext(request);
+      const result = await controller.upload(ctx, {
         buffer,
         mimeType: file.mimetype,
       });
 
-      return reply.status(201).send({ success: true, data: result });
+      sendCreated(reply, result);
     },
   );
 }

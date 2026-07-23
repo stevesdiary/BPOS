@@ -1,4 +1,8 @@
 import { createWorker, QUEUES } from '../client.js';
+import { db } from '../../db/client.js';
+import { tenants } from '../../db/schema/public.js';
+import { eq } from 'drizzle-orm';
+import { sendSMS } from '../../sms/index.js';
 
 export interface FailedWebhookJobData {
   tenantId: string;
@@ -10,8 +14,6 @@ export interface FailedWebhookJobData {
   failedAt: string;
 }
 
-// Dead-letter queue handler for failed webhook events.
-// Logs the failure for manual review; in Phase 2 this will alert via Termii/email.
 export const paymentsWorker = createWorker<FailedWebhookJobData>(
   QUEUES.PAYMENTS,
   async (job) => {
@@ -19,6 +21,17 @@ export const paymentsWorker = createWorker<FailedWebhookJobData>(
     job.log(
       `[DLQ] Failed webhook event — tenant=${tenantId} type=${eventType} eventId=${eventId} error="${error}" failedAt=${failedAt}`,
     );
-    // TODO Phase 2: send alert via Termii SMS or email to tenant owner
+
+    // Send alert to tenant owner
+    const [tenant] = await db
+      .select({ businessPhone: tenants.businessPhone, name: tenants.name })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (tenant?.businessPhone) {
+      const message = `[BPOS] Payment webhook failed: event "${eventType}" for tenant "${tenant.name}". Please check your dashboard.`;
+      await sendSMS(tenant.businessPhone, message);
+    }
   },
 );

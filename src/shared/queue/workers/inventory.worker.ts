@@ -1,4 +1,8 @@
 import { createWorker, QUEUES } from '../client.js';
+import { db } from '../../db/client.js';
+import { tenants } from '../../db/schema/public.js';
+import { eq } from 'drizzle-orm';
+import { sendSMS } from '../../sms/index.js';
 
 export interface LowStockJobData {
   tenantId: string;
@@ -21,7 +25,16 @@ export const inventoryWorker = createWorker<LowStockJobData>(
         `qty=${quantityOnHand} threshold=${threshold} location=${locationId}`,
     );
 
-    // TODO Phase 2: send Termii SMS to tenant contact number
-    // For now, structured log is the alert mechanism
+    // Send SMS to tenant owner
+    const [tenant] = await db
+      .select({ businessPhone: tenants.businessPhone, name: tenants.name })
+      .from(tenants)
+      .where(eq(tenants.id, tenantId))
+      .limit(1);
+
+    if (tenant?.businessPhone) {
+      const message = `[BPOS] Low stock alert: "${variantName}" (SKU: ${sku}) has ${quantityOnHand} units remaining (threshold: ${threshold}).`;
+      await sendSMS(tenant.businessPhone, message);
+    }
   },
 );

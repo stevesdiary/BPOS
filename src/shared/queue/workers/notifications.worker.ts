@@ -1,4 +1,5 @@
 import { createWorker, QUEUES } from '../client.js';
+import { sendSMS } from '../../sms/index.js';
 
 interface SmsJobData {
   to: string;
@@ -20,11 +21,11 @@ export const notificationsWorker = createWorker<NotificationJobData>(
   async (job) => {
     if (job.name === 'send-sms') {
       const data = job.data as SmsJobData;
-      // TODO: Implement Termii SMS integration in Stage 1
-      await job.log(`SMS queued to ${data.to}: ${data.message.substring(0, 50)}...`);
+      await sendSMS(data.to, data.message);
+      await job.log(`SMS sent to ${data.to}`);
     } else if (job.name === 'send-email') {
       const data = job.data as EmailJobData;
-      // TODO: Implement email sending
+      // TODO: Implement email sending via Resend
       await job.log(`Email queued to ${data.to}: ${data.subject}`);
     }
   },

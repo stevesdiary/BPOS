@@ -28,9 +28,12 @@ const envSchema = z.object({
   PAYSTACK_SECRET_KEY: z.string(),
   PAYSTACK_PUBLIC_KEY: z.string(),
 
-  // Termii SMS
+  // SMS provider (termii | vtpass)
+  SMS_PROVIDER: z.enum(['termii', 'vtpass']).default('termii'),
   TERMII_API_KEY: z.string(),
   TERMII_SENDER_ID: z.string().default('BPOS'),
+  VTPASS_API_KEY: z.string().optional(),
+  VTPASS_SENDER_ID: z.string().optional(),
 
   // Flutterwave (Phase 2 — alternative gateway)
   FLUTTERWAVE_SECRET_KEY: z.string().optional(),

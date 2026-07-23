@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { createExpense, listExpenses, getExpense } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('expenses:track')];
 
@@ -40,12 +42,9 @@ export default async function expensesRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const expense = await createExpense(
-      request.tenant.schema,
-      request.user.sub,
-      request.body,
-    );
-    return reply.status(201).send({ success: true, data: expense });
+    const ctx = createContext(request);
+    const expense = await controller.create(ctx, request.body);
+    sendCreated(reply, expense);
   });
 
   app.get<{
@@ -75,17 +74,10 @@ export default async function expensesRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const q = request.query;
-    const result = await listExpenses(request.tenant.schema, {
-      ...(q.page && { page: parseInt(q.page) }),
-      ...(q.limit && { limit: parseInt(q.limit) }),
-      ...(q.category && { category: q.category }),
-      ...(q.locationId && { locationId: q.locationId }),
-      ...(q.from && { from: q.from }),
-      ...(q.to && { to: q.to }),
-    });
-    return { success: true, data: result };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const result = await controller.list(ctx, request.query);
+    sendSuccess(reply, result);
   });
 
   app.get<{ Params: { id: string } }>('/:id', {
@@ -100,8 +92,9 @@ export default async function expensesRoutes(app: FastifyInstance) {
         properties: { id: { type: 'string' } },
       },
     },
-  }, async (request) => {
-    const expense = await getExpense(request.tenant.schema, request.params.id);
-    return { success: true, data: expense };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const expense = await controller.get(ctx, request.params.id);
+    sendSuccess(reply, expense);
   });
 }

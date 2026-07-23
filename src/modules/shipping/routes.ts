@@ -2,26 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { NG_STATES } from './ng-states.js';
-import {
-  createShippingZone,
-  listShippingZones,
-  updateShippingZone,
-  deleteShippingZone,
-  createShippingMethod,
-  listShippingMethods,
-  updateShippingMethod,
-  addShippingRate,
-  listShippingRates,
-  deleteShippingRate,
-  addFreeShippingCondition,
-  listFreeShippingConditions,
-  deleteFreeShippingCondition,
-  createPickupLocation,
-  listPickupLocations,
-  updatePickupLocation,
-} from './service.js';
-import { getAvailableShippingOptions, resolveMethodFee } from './calculator.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const managerGuard = [requireAuth, resolveTenant];
 const shippingFeature = requireFeature('shipping:manage');
@@ -36,7 +19,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       summary: 'List valid Nigerian state names for zone/rate configuration',
       security: [{ bearerAuth: [] }],
     },
-  }, async () => ({ success: true, data: NG_STATES }));
+  }, async (_request, reply) => {
+    sendSuccess(reply, controller.getStates());
+  });
 
   // ── Shipping Zones ────────────────────────────────────────────────────────────
 
@@ -56,8 +41,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const zone = await createShippingZone(request.tenant.schema, request.body);
-    return reply.status(201).send({ success: true, data: zone });
+    const ctx = createContext(request);
+    const zone = await controller.createZone(ctx, request.body);
+    sendCreated(reply, zone);
   });
 
   app.get('/zones', {
@@ -67,8 +53,10 @@ export default async function shippingRoutes(app: FastifyInstance) {
       summary: 'List shipping zones',
       security: [{ bearerAuth: [] }],
     },
-  }, async (request) => {
-    return { success: true, data: await listShippingZones(request.tenant.schema) };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const zones = await controller.listZones(ctx);
+    sendSuccess(reply, zones);
   });
 
   app.patch<{ Params: { id: string }; Body: { name?: string; states?: string[] } }>('/zones/:id', {
@@ -87,8 +75,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    await updateShippingZone(request.tenant.schema, request.params.id, request.body);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.updateZone(ctx, request.params.id, request.body);
+    sendSuccess(reply, { message: 'Zone updated' });
   });
 
   app.delete<{ Params: { id: string } }>('/zones/:id', {
@@ -100,8 +89,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       params: { type: 'object', properties: { id: { type: 'string' } } },
     },
   }, async (request, reply) => {
-    await deleteShippingZone(request.tenant.schema, request.params.id);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.deleteZone(ctx, request.params.id);
+    sendSuccess(reply, { message: 'Zone deleted' });
   });
 
   // ── Shipping Methods ──────────────────────────────────────────────────────────
@@ -148,8 +138,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const method = await createShippingMethod(request.tenant.schema, request.body as never);
-    return reply.status(201).send({ success: true, data: method });
+    const ctx = createContext(request);
+    const method = await controller.createMethod(ctx, request.body as never);
+    sendCreated(reply, method);
   });
 
   app.get('/methods', {
@@ -159,8 +150,10 @@ export default async function shippingRoutes(app: FastifyInstance) {
       summary: 'List all shipping methods',
       security: [{ bearerAuth: [] }],
     },
-  }, async (request) => {
-    return { success: true, data: await listShippingMethods(request.tenant.schema) };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const methods = await controller.listMethods(ctx);
+    sendSuccess(reply, methods);
   });
 
   app.patch<{
@@ -189,8 +182,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    await updateShippingMethod(request.tenant.schema, request.params.id, request.body);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.updateMethod(ctx, request.params.id, request.body);
+    sendSuccess(reply, { message: 'Method updated' });
   });
 
   // ── Shipping Rates (zone / value / weight) ────────────────────────────────────
@@ -221,8 +215,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const rate = await addShippingRate(request.tenant.schema, request.params.id, request.body);
-    return reply.status(201).send({ success: true, data: rate });
+    const ctx = createContext(request);
+    const rate = await controller.addRate(ctx, request.params.id, request.body);
+    sendCreated(reply, rate);
   });
 
   app.get<{ Params: { id: string } }>('/methods/:id/rates', {
@@ -233,8 +228,10 @@ export default async function shippingRoutes(app: FastifyInstance) {
       security: [{ bearerAuth: [] }],
       params: { type: 'object', properties: { id: { type: 'string' } } },
     },
-  }, async (request) => {
-    return { success: true, data: await listShippingRates(request.tenant.schema, request.params.id) };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const rates = await controller.listRates(ctx, request.params.id);
+    sendSuccess(reply, rates);
   });
 
   app.delete<{ Params: { id: string; rateId: string } }>('/methods/:id/rates/:rateId', {
@@ -246,8 +243,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       params: { type: 'object', properties: { id: { type: 'string' }, rateId: { type: 'string' } } },
     },
   }, async (request, reply) => {
-    await deleteShippingRate(request.tenant.schema, request.params.rateId);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.deleteRate(ctx, request.params.rateId);
+    sendSuccess(reply, { message: 'Rate deleted' });
   });
 
   // ── Free Shipping Conditions ───────────────────────────────────────────────────
@@ -276,12 +274,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const condition = await addFreeShippingCondition(
-      request.tenant.schema,
-      request.params.id,
-      request.body as never,
-    );
-    return reply.status(201).send({ success: true, data: condition });
+    const ctx = createContext(request);
+    const condition = await controller.addCondition(ctx, request.params.id, request.body);
+    sendCreated(reply, condition);
   });
 
   app.get<{ Params: { id: string } }>('/methods/:id/conditions', {
@@ -292,11 +287,10 @@ export default async function shippingRoutes(app: FastifyInstance) {
       security: [{ bearerAuth: [] }],
       params: { type: 'object', properties: { id: { type: 'string' } } },
     },
-  }, async (request) => {
-    return {
-      success: true,
-      data: await listFreeShippingConditions(request.tenant.schema, request.params.id),
-    };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const conditions = await controller.listConditions(ctx, request.params.id);
+    sendSuccess(reply, conditions);
   });
 
   app.delete<{ Params: { id: string; conditionId: string } }>('/methods/:id/conditions/:conditionId', {
@@ -308,8 +302,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       params: { type: 'object', properties: { id: { type: 'string' }, conditionId: { type: 'string' } } },
     },
   }, async (request, reply) => {
-    await deleteFreeShippingCondition(request.tenant.schema, request.params.conditionId);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.deleteCondition(ctx, request.params.conditionId);
+    sendSuccess(reply, { message: 'Condition deleted' });
   });
 
   // ── Pick-up Locations ─────────────────────────────────────────────────────────
@@ -348,8 +343,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const pl = await createPickupLocation(request.tenant.schema, request.body as never);
-    return reply.status(201).send({ success: true, data: pl });
+    const ctx = createContext(request);
+    const pl = await controller.createPickup(ctx, request.body);
+    sendCreated(reply, pl);
   });
 
   app.get<{ Querystring: { state?: string } }>('/pickup-locations', {
@@ -362,16 +358,10 @@ export default async function shippingRoutes(app: FastifyInstance) {
         properties: { state: { type: 'string' } },
       },
     },
-  }, async (request) => {
-    // Extract schema from JWT if present, else require tenantId query param
-    // For simplicity, require auth here — storefront can use a public tenant token
-    const schema = (request as never as { tenant?: { schema: string } }).tenant?.schema;
-    if (!schema) return { success: true, data: [] };
-    const locs = await listPickupLocations(schema, {
-      ...(request.query.state ? { state: request.query.state } : {}),
-      activeOnly: true,
-    });
-    return { success: true, data: locs };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const locs = await controller.listPickups(ctx, request.query);
+    sendSuccess(reply, locs);
   });
 
   app.patch<{
@@ -398,8 +388,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    await updatePickupLocation(request.tenant.schema, request.params.id, request.body);
-    return reply.send({ success: true });
+    const ctx = createContext(request);
+    await controller.updatePickup(ctx, request.params.id, request.body);
+    sendSuccess(reply, { message: 'Pickup location updated' });
   });
 
   // ── Checkout Calculator ───────────────────────────────────────────────────────
@@ -431,20 +422,9 @@ export default async function shippingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const q = request.query;
-    const schema = (request as never as { tenant?: { schema: string } }).tenant?.schema;
-    if (!schema) return { success: true, data: [] };
-
-    const options = await getAvailableShippingOptions(schema, {
-      orderValueKobo: parseInt(q.orderValueKobo),
-      ...(q.destinationState ? { destinationState: q.destinationState } : {}),
-      ...(q.totalWeightKg ? { totalWeightKg: parseFloat(q.totalWeightKg) } : {}),
-      ...(q.promoCode ? { promoCode: q.promoCode } : {}),
-      ...(q.itemProductIds ? { itemProductIds: q.itemProductIds.split(',') } : {}),
-      ...(q.itemCategoryIds ? { itemCategoryIds: q.itemCategoryIds.split(',') } : {}),
-    });
-
-    return { success: true, data: options };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const options = await controller.getAvailable(ctx, request.query);
+    sendSuccess(reply, options);
   });
 }

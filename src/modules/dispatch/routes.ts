@@ -3,15 +3,10 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { requireManager } from '../../shared/middleware/auth.js';
-import {
-  configureLogistics,
-  getDispatchConfig,
-  getQuote,
-  dispatchOrder,
-  trackShipment,
-  handleLogisticsWebhook,
-  type LogisticsWebhookPayload,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess } from '../../shared/http/response.js';
+import * as controller from './controller.js';
+import type { LogisticsWebhookPayload } from './service.js';
 
 export default async function dispatchRoutes(app: FastifyInstance) {
   // ─── Configure logistics provider ──────────────────────────────────────────
@@ -57,14 +52,9 @@ export default async function dispatchRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { provider, apiKey, webhookSecret, baseUrl } = request.body;
-      await configureLogistics(request.tenant.tenantId, provider, apiKey, {
-        webhookSecret,
-        ...(baseUrl ? { baseUrl } : {}),
-      });
-      // Return the per-tenant webhook URL the merchant should register with the provider
-      const webhookUrl = `${process.env['PLATFORM_BASE_URL'] ?? ''}/v1/dispatch/webhook/${provider}/${request.tenant.tenantId}`;
-      return reply.code(200).send({ success: true, provider, webhookUrl });
+      const ctx = createContext(request);
+      const result = await controller.configure(ctx, request.body);
+      sendSuccess(reply, result);
     },
   );
 
@@ -91,8 +81,9 @@ export default async function dispatchRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const config = await getDispatchConfig(request.tenant.tenantId);
-      return reply.send(config);
+      const ctx = createContext(request);
+      const config = await controller.getConfig(ctx);
+      sendSuccess(reply, config);
     },
   );
 
@@ -133,13 +124,9 @@ export default async function dispatchRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await getQuote(
-        request.tenant.tenantId,
-        request.body.pickupAddress,
-        request.body.deliveryAddress,
-        request.body.weightKg,
-      );
-      return reply.send(result);
+      const ctx = createContext(request);
+      const result = await controller.quote(ctx, request.body);
+      sendSuccess(reply, result);
     },
   );
 
@@ -191,16 +178,9 @@ export default async function dispatchRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await dispatchOrder(
-        request.tenant.tenantId,
-        request.tenant.schema,
-        request.params.orderId,
-        request.body.pickupAddress,
-        request.body.recipientName,
-        request.body.recipientPhone,
-        request.body.weightKg,
-      );
-      return reply.send(result);
+      const ctx = createContext(request);
+      const result = await controller.dispatch(ctx, request.params.orderId, request.body);
+      sendSuccess(reply, result);
     },
   );
 
@@ -230,26 +210,14 @@ export default async function dispatchRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await trackShipment(
-        request.tenant.tenantId,
-        request.tenant.schema,
-        request.params.orderId,
-      );
-      return reply.send(result);
+      const ctx = createContext(request);
+      const result = await controller.track(ctx, request.params.orderId);
+      sendSuccess(reply, result);
     },
   );
 
   // ─── Inbound webhook from logistics provider ───────────────────────────────
-  //
-  // URL: POST /v1/dispatch/webhook/:provider/:tenantId
-  //
-  // Each BPOS business registers their unique webhook URL with the provider.
-  // The :tenantId segment routes the event to the correct tenant without
-  // relying on metadata inside the payload — which may not be present for
-  // some provider event types.
 
-  // Scope the raw-body buffer parser to a sub-plugin so it only applies to the
-  // webhook route and does not override the JSON parser for other dispatch routes.
   await app.register(async (webhookPlugin) => {
     webhookPlugin.addContentTypeParser(
       'application/json',
@@ -287,10 +255,13 @@ export default async function dispatchRoutes(app: FastifyInstance) {
           return reply.code(400).send({ error: 'Invalid JSON body' });
         }
 
-        if (!payload.metadata) payload.metadata = {};
-        if (!payload.metadata.tenantId) payload.metadata.tenantId = request.params.tenantId;
-
-        await handleLogisticsWebhook(rawBody, signature, request.params.provider, payload);
+        await controller.handleWebhook(
+          rawBody,
+          signature,
+          request.params.provider,
+          request.params.tenantId,
+          payload,
+        );
         return reply.code(200).send({ received: true });
       },
     );

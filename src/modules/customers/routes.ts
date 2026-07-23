@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { createCustomer, listCustomers, getCustomer, updateCustomer } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('customers:manage')];
 
@@ -47,8 +49,9 @@ export default async function customersRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const customer = await createCustomer(request.tenant.schema, request.body);
-      return reply.status(201).send({ success: true, data: customer });
+      const ctx = createContext(request);
+      const customer = await controller.create(ctx, request.body);
+      sendCreated(reply, customer);
     },
   );
 
@@ -70,14 +73,10 @@ export default async function customersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const q = request.query;
-      const result = await listCustomers(request.tenant.schema, {
-        ...(q.page && { page: parseInt(q.page) }),
-        ...(q.limit && { limit: parseInt(q.limit) }),
-        ...(q.search && { search: q.search }),
-      });
-      return { success: true, data: result };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const result = await controller.list(ctx, request.query);
+      sendSuccess(reply, result);
     },
   );
 
@@ -96,9 +95,10 @@ export default async function customersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const customer = await getCustomer(request.tenant.schema, request.params.id);
-      return { success: true, data: customer };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const customer = await controller.get(ctx, request.params.id);
+      sendSuccess(reply, customer);
     },
   );
 
@@ -143,15 +143,10 @@ export default async function customersRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const { consentGivenAt, ...rest } = request.body;
-      const customer = await updateCustomer(request.tenant.schema, request.params.id, {
-        ...rest,
-        ...(consentGivenAt !== undefined && {
-          consentGivenAt: consentGivenAt ? new Date(consentGivenAt) : null,
-        }),
-      });
-      return { success: true, data: customer };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const customer = await controller.update(ctx, request.params.id, request.body);
+      sendSuccess(reply, customer);
     },
   );
 }

@@ -3,13 +3,9 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { requireManager } from '../../shared/middleware/auth.js';
-import {
-  listLocations,
-  getLocation,
-  createLocation,
-  updateLocation,
-  deactivateLocation,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const readGuard = [requireAuth, resolveTenant, requireFeature('locations:manage')];
 const writeGuard = [requireAuth, resolveTenant, requireFeature('locations:manage'), requireManager];
@@ -22,9 +18,10 @@ export default async function locationsRoutes(app: FastifyInstance) {
       summary: 'List all locations',
       security: [{ bearerAuth: [] }],
     },
-  }, async (request) => {
-    const items = await listLocations(request.tenant.schema);
-    return { success: true, data: items };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const items = await controller.list(ctx);
+    sendSuccess(reply, items);
   });
 
   app.get<{ Params: { id: string } }>('/:id', {
@@ -39,9 +36,10 @@ export default async function locationsRoutes(app: FastifyInstance) {
         properties: { id: { type: 'string' } },
       },
     },
-  }, async (request) => {
-    const loc = await getLocation(request.tenant.schema, request.params.id);
-    return { success: true, data: loc };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const loc = await controller.get(ctx, request.params.id);
+    sendSuccess(reply, loc);
   });
 
   app.post<{
@@ -70,8 +68,9 @@ export default async function locationsRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const loc = await createLocation(request.tenant.schema, request.body);
-    return reply.status(201).send({ success: true, data: loc });
+    const ctx = createContext(request);
+    const loc = await controller.create(ctx, request.body);
+    sendCreated(reply, loc);
   });
 
   app.patch<{
@@ -106,9 +105,10 @@ export default async function locationsRoutes(app: FastifyInstance) {
         additionalProperties: false,
       },
     },
-  }, async (request) => {
-    const loc = await updateLocation(request.tenant.schema, request.params.id, request.body);
-    return { success: true, data: loc };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const loc = await controller.update(ctx, request.params.id, request.body);
+    sendSuccess(reply, loc);
   });
 
   app.delete<{ Params: { id: string } }>('/:id', {
@@ -124,7 +124,8 @@ export default async function locationsRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    await deactivateLocation(request.tenant.schema, request.params.id);
-    return reply.status(204).send();
+    const ctx = createContext(request);
+    await controller.deactivate(ctx, request.params.id);
+    reply.status(204).send();
   });
 }

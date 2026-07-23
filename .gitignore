@@ -6,3 +6,5 @@ tsconfig.tsbuildinfo
 !.env.example
 coverage
 *.local
+src/shared/http/context.ts
+src/shared/http/response.ts

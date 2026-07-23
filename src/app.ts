@@ -4,6 +4,7 @@ import jwtPlugin from '@fastify/jwt';
 import { env } from './config/env.js';
 import { errorHandler } from './shared/errors/handler.js';
 import { registerRequestId } from './shared/middleware/request-id.js';
+import { runHealthChecks } from './shared/health/check.js';
 
 // Plugins
 import helmetPlugin from './plugins/helmet.js';
@@ -76,11 +77,12 @@ export function buildApp() {
   registerRequestId(app);
 
   // Health check (unauthenticated, not in swagger)
-  app.get('/health', { schema: { hide: true } }, async () => ({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    environment: env.NODE_ENV,
-  }));
+  // Returns DB + Redis + queue status with appropriate HTTP status code
+  app.get('/health', { schema: { hide: true } }, async (_request, reply) => {
+    const health = await runHealthChecks();
+    const statusCode = health.status === 'ok' ? 200 : health.status === 'degraded' ? 200 : 503;
+    return reply.status(statusCode).send(health);
+  });
 
   // Module routes
   void app.register(authRoutes, { prefix: '/v1/auth' });

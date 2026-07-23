@@ -8,6 +8,8 @@ import {
   loginUser,
   refreshAccessToken,
   revokeRefreshToken,
+  requestPasswordReset,
+  resetPassword,
 } from './service.js';
 
 const loginBody = {
@@ -165,6 +167,113 @@ export default async function authRoutes(app: FastifyInstance) {
           email: request.user.email,
           role: request.user.role,
         },
+      };
+    },
+  );
+
+  // ─── Password Reset ────────────────────────────────────────────────────────
+
+  app.post<{ Body: { tenantSlug: string; email: string } }>(
+    '/forgot-password',
+    {
+      config: {
+        rateLimit: { max: 5, timeWindow: '15 minutes' },
+      },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Request a password reset email',
+        security: [],
+        description:
+          'Always returns success to prevent email enumeration. ' +
+          'If the email exists, a reset link is sent.',
+        body: {
+          type: 'object',
+          required: ['tenantSlug', 'email'],
+          properties: {
+            tenantSlug: { type: 'string' },
+            email: { type: 'string', format: 'email' },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request) => {
+      const { tenantSlug, email } = request.body;
+
+      const [tenant] = await db
+        .select({ id: tenants.id, schemaName: tenants.schemaName })
+        .from(tenants)
+        .where(eq(tenants.slug, tenantSlug))
+        .limit(1);
+
+      if (!tenant) {
+        // Still return success to prevent tenant enumeration
+        return {
+          success: true,
+          data: { message: 'If the email exists, a reset link has been sent' },
+        };
+      }
+
+      const result = await requestPasswordReset(tenant.id, tenant.schemaName, email);
+
+      // In a real implementation, send email here with result.rawToken
+      // For now, just log the token (development only)
+      if (result) {
+        request.log.info(
+          { token: result.rawToken, email: result.userEmail },
+          'Password reset token generated (dev only — would be sent via email in production)',
+        );
+      }
+
+      // Always return the same response to prevent email enumeration
+      return {
+        success: true,
+        data: { message: 'If the email exists, a reset link has been sent' },
+      };
+    },
+  );
+
+  app.post<{ Body: { tenantSlug: string; token: string; newPassword: string } }>(
+    '/reset-password',
+    {
+      config: {
+        rateLimit: { max: 5, timeWindow: '15 minutes' },
+      },
+      schema: {
+        tags: ['Auth'],
+        summary: 'Reset password using token from email',
+        security: [],
+        description: 'Rate limited: 5 requests per 15 minutes.',
+        body: {
+          type: 'object',
+          required: ['tenantSlug', 'token', 'newPassword'],
+          properties: {
+            tenantSlug: { type: 'string' },
+            token: { type: 'string', minLength: 1 },
+            newPassword: { type: 'string', minLength: 8 },
+          },
+          additionalProperties: false,
+        },
+      },
+    },
+    async (request) => {
+      const { tenantSlug, token, newPassword } = request.body;
+
+      const [tenant] = await db
+        .select({ id: tenants.id, schemaName: tenants.schemaName })
+        .from(tenants)
+        .where(eq(tenants.slug, tenantSlug))
+        .limit(1);
+
+      if (!tenant) {
+        throw new NotFoundError('Tenant');
+      }
+
+      await resetPassword(tenant.id, tenant.schemaName, token, newPassword);
+
+      return {
+        success: true,
+        data: { message: 'Password reset successful. Please login with your new password.' },
       };
     },
   );

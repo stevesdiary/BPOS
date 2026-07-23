@@ -2,7 +2,7 @@ import argon2 from 'argon2';
 import { v4 as uuidv4 } from 'uuid';
 import { eq, and, gt, isNull } from 'drizzle-orm';
 import { db } from '../../shared/db/client.js';
-import { refreshTokens } from '../../shared/db/schema/public.js';
+import { refreshTokens, passwordResetTokens } from '../../shared/db/schema/public.js';
 import { withTenantSchema } from '../../shared/db/tenant.js';
 import { users } from '../../shared/db/schema/tenant.js';
 import { UnauthorizedError, NotFoundError } from '../../shared/errors/types.js';
@@ -197,4 +197,137 @@ export async function revokeRefreshToken(
       return;
     }
   }
+}
+
+// ─── Password Reset ──────────────────────────────────────────────────────────
+
+const RESET_TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Generate a password reset token for a user.
+ * Returns the raw token (to be sent via email) and the user's email.
+ * Always returns success to prevent email enumeration.
+ */
+export async function requestPasswordReset(
+  tenantId: string,
+  schemaName: string,
+  email: string,
+): Promise<{ rawToken: string; userEmail: string } | null> {
+  const user = await withTenantSchema(schemaName, async (tenantDb) => {
+    const [found] = await tenantDb
+      .select()
+      .from(users)
+      .where(and(eq(users.email, email.toLowerCase()), eq(users.isActive, true)))
+      .limit(1);
+    return found;
+  });
+
+  if (!user) {
+    // Return null to prevent email enumeration — caller should treat as success anyway
+    return null;
+  }
+
+  // Invalidate any existing reset tokens for this user
+  await db
+    .update(passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(
+      and(
+        eq(passwordResetTokens.tenantId, tenantId),
+        eq(passwordResetTokens.userId, user.id),
+        isNull(passwordResetTokens.usedAt),
+      ),
+    );
+
+  // Generate a cryptographically secure random token
+  const rawToken = uuidv4() + uuidv4(); // 64 hex chars
+  const tokenHash = await argon2.hash(rawToken);
+  const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
+
+  await db.insert(passwordResetTokens).values({
+    id: uuidv4(),
+    tenantId,
+    userId: user.id,
+    tokenHash,
+    expiresAt,
+  });
+
+  return { rawToken, userEmail: user.email };
+}
+
+/**
+ * Reset a user's password using a valid reset token.
+ * Throws if token is invalid or expired.
+ */
+export async function resetPassword(
+  tenantId: string,
+  schemaName: string,
+  rawToken: string,
+  newPassword: string,
+): Promise<void> {
+  const now = new Date();
+
+  // Find all non-used, non-expired tokens for this tenant
+  const pendingTokens = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.tenantId, tenantId),
+        gt(passwordResetTokens.expiresAt, now),
+        isNull(passwordResetTokens.usedAt),
+      ),
+    );
+
+  let matched: (typeof pendingTokens)[number] | undefined;
+  for (const token of pendingTokens) {
+    const valid = await argon2.verify(token.tokenHash, rawToken);
+    if (valid) {
+      matched = token;
+      break;
+    }
+  }
+
+  if (!matched) {
+    throw new UnauthorizedError('Invalid or expired reset token');
+  }
+
+  // Hash the new password
+  const passwordHash = await argon2.hash(newPassword, {
+    type: argon2.argon2id,
+    memoryCost: 65536,
+    timeCost: 3,
+    parallelism: 4,
+  });
+
+  // Update the user's password
+  await withTenantSchema(schemaName, async (tenantDb) => {
+    const [updated] = await tenantDb
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, matched!.userId))
+      .returning({ id: users.id });
+
+    if (!updated) {
+      throw new NotFoundError('User', matched!.userId);
+    }
+  });
+
+  // Mark the token as used
+  await db
+    .update(passwordResetTokens)
+    .set({ usedAt: now })
+    .where(eq(passwordResetTokens.id, matched.id));
+
+  // Invalidate all refresh tokens for this user (force re-login)
+  await db
+    .update(refreshTokens)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(refreshTokens.tenantId, tenantId),
+        eq(refreshTokens.userId, matched.userId),
+        isNull(refreshTokens.revokedAt),
+      ),
+    );
 }

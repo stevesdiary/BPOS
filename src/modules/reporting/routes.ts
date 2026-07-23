@@ -2,15 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { ValidationError } from '../../shared/errors/types.js';
-import {
-  getPLReport,
-  getBestSellers,
-  getRevenueByLocation,
-  getStaffSalesReport,
-  getInventoryValuation,
-} from './service.js';
-import { toCsv } from '../../shared/utils/csv.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCsv } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 export default async function reportingRoutes(app: FastifyInstance) {
   // ─── P&L report ─────────────────────────────────────────────────────────────
@@ -32,13 +26,10 @@ export default async function reportingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const { from, to } = request.query;
-    if (new Date(from) > new Date(to)) {
-      throw new ValidationError("'from' must be before 'to'");
-    }
-    const report = await getPLReport(request.tenant.schema, from, to);
-    return { success: true, data: report };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const report = await controller.getPL(ctx, request.query.from, request.query.to);
+    sendSuccess(reply, report);
   });
 
   // ─── Best-selling products ───────────────────────────────────────────────────
@@ -57,14 +48,10 @@ export default async function reportingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const q = request.query;
-    const rows = await getBestSellers(request.tenant.schema, {
-      ...(q.from && { from: q.from }),
-      ...(q.to && { to: q.to }),
-      ...(q.limit && { limit: parseInt(q.limit) }),
-    });
-    return { success: true, data: rows };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const rows = await controller.getBestSellers(ctx, request.query);
+    sendSuccess(reply, rows);
   });
 
   // ─── Revenue by location ─────────────────────────────────────────────────────
@@ -82,13 +69,10 @@ export default async function reportingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const q = request.query;
-    const rows = await getRevenueByLocation(request.tenant.schema, {
-      ...(q.from && { from: q.from }),
-      ...(q.to && { to: q.to }),
-    });
-    return { success: true, data: rows };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const rows = await controller.getRevenueByLocation(ctx, request.query);
+    sendSuccess(reply, rows);
   });
 
   // ─── Staff sales report ──────────────────────────────────────────────────────
@@ -106,13 +90,10 @@ export default async function reportingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const q = request.query;
-    const rows = await getStaffSalesReport(request.tenant.schema, {
-      ...(q.from && { from: q.from }),
-      ...(q.to && { to: q.to }),
-    });
-    return { success: true, data: rows };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const rows = await controller.getStaffSales(ctx, request.query);
+    sendSuccess(reply, rows);
   });
 
   // ─── P&L export (CSV) ────────────────────────────────────────────────────────
@@ -132,29 +113,9 @@ export default async function reportingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const { from, to } = request.query;
-    if (new Date(from) > new Date(to)) throw new ValidationError("'from' must be before 'to'");
-
-    const r = await getPLReport(request.tenant.schema, from, to);
-    const naira = (k: number) => (k / 100).toFixed(2);
-
-    const csv = toCsv([
-      ['Profit & Loss Report'],
-      [`Period: ${from} to ${to}`],
-      [],
-      ['Category', 'Amount (NGN)'],
-      ['Revenue', naira(r.revenueKobo)],
-      ['Cost of Goods Sold', naira(r.cogsKobo)],
-      ['Gross Profit', naira(r.grossProfitKobo)],
-      ['Operating Expenses', naira(r.operatingExpensesKobo)],
-      ['Payment Fees', naira(r.paymentFeesKobo)],
-      ['Refunds', naira(r.refundsKobo)],
-      ['Net Profit', naira(r.netProfitKobo)],
-    ]);
-
-    void reply.header('Content-Type', 'text/csv');
-    void reply.header('Content-Disposition', `attachment; filename="pl-${from.slice(0, 10)}-${to.slice(0, 10)}.csv"`);
-    return reply.send(csv);
+    const ctx = createContext(request);
+    const csv = await controller.exportPL(ctx, request.query.from, request.query.to);
+    sendCsv(reply, csv, `pl-${request.query.from.slice(0, 10)}-${request.query.to.slice(0, 10)}.csv`);
   });
 
   // ─── Staff sales export (CSV) ─────────────────────────────────────────────────
@@ -173,25 +134,9 @@ export default async function reportingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const q = request.query;
-    const rows = await getStaffSalesReport(request.tenant.schema, {
-      ...(q.from && { from: q.from }),
-      ...(q.to && { to: q.to }),
-    });
-
-    const naira = (k: number) => (k / 100).toFixed(2);
-    const csv = toCsv([
-      ['Staff Name', 'Order Count', 'Revenue (NGN)'],
-      ...rows.map((r) => [
-        `${r.firstName} ${r.lastName}`,
-        String(r.orderCount),
-        naira(r.totalRevenueKobo),
-      ]),
-    ]);
-
-    void reply.header('Content-Type', 'text/csv');
-    void reply.header('Content-Disposition', 'attachment; filename="staff-sales.csv"');
-    return reply.send(csv);
+    const ctx = createContext(request);
+    const csv = await controller.exportStaffSales(ctx, request.query);
+    sendCsv(reply, csv, 'staff-sales.csv');
   });
 
   // ─── Inventory valuation ──────────────────────────────────────────────────────
@@ -210,33 +155,16 @@ export default async function reportingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const rows = await getInventoryValuation(request.tenant.schema);
+    const ctx = createContext(request);
 
     if (request.query.format === 'csv') {
-      const naira = (k: number) => (k / 100).toFixed(2);
-      const totalValue = rows.reduce((s, r) => s + r.totalValueKobo, 0);
-
-      const csv = toCsv([
-        ['SKU', 'Product', 'Variant', 'Location', 'Quantity', 'Unit Cost (NGN)', 'Total Value (NGN)'],
-        ...rows.map((r) => [
-          r.sku,
-          r.productName,
-          r.variantName,
-          r.locationName ?? 'Unassigned',
-          String(r.quantityOnHand),
-          naira(r.unitCostKobo),
-          naira(r.totalValueKobo),
-        ]),
-        [],
-        ['', '', '', 'TOTAL', '', '', naira(totalValue)],
-      ]);
-
-      void reply.header('Content-Type', 'text/csv');
-      void reply.header('Content-Disposition', 'attachment; filename="inventory-valuation.csv"');
-      return reply.send(csv);
+      const csv = await controller.exportInventoryValuation(ctx);
+      sendCsv(reply, csv, 'inventory-valuation.csv');
+      return;
     }
 
+    const rows = await controller.getInventoryValuation(ctx);
     const totalValueKobo = rows.reduce((s, r) => s + r.totalValueKobo, 0);
-    return { success: true, data: { rows, totalValueKobo } };
+    sendSuccess(reply, { rows, totalValueKobo });
   });
 }

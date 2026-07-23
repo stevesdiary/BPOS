@@ -3,13 +3,9 @@ import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireManager } from '../../shared/middleware/auth.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import {
-  listInventory,
-  receiveStock,
-  adjustStock,
-  listMovements,
-  getLowStock,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const readGuard = [requireAuth, resolveTenant, requireFeature('inventory:track')];
 const writeGuard = [requireAuth, resolveTenant, requireManager, requireFeature('inventory:track')];
@@ -34,9 +30,10 @@ export default async function inventoryRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const items = await listInventory(request.tenant.schema, request.query);
-      return { success: true, data: items };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const data = await controller.list(ctx, request.query);
+      sendSuccess(reply, data);
     },
   );
 
@@ -69,12 +66,9 @@ export default async function inventoryRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await receiveStock(
-        request.tenant.schema,
-        request.user.userId,
-        request.body,
-      );
-      return reply.status(201).send({ success: true, data: result });
+      const ctx = createContext(request);
+      const data = await controller.receive(ctx, request.body);
+      sendCreated(reply, data);
     },
   );
 
@@ -107,12 +101,9 @@ export default async function inventoryRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const result = await adjustStock(
-        request.tenant.schema,
-        request.user.userId,
-        request.body,
-      );
-      return reply.status(200).send({ success: true, data: result });
+      const ctx = createContext(request);
+      const data = await controller.adjust(ctx, request.body);
+      sendSuccess(reply, data);
     },
   );
 
@@ -138,16 +129,10 @@ export default async function inventoryRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const q = request.query;
-      const result = await listMovements(request.tenant.schema, {
-        ...(q.variantId && { variantId: q.variantId }),
-        ...(q.from && { from: q.from }),
-        ...(q.to && { to: q.to }),
-        ...(q.page && { page: parseInt(q.page) }),
-        ...(q.limit && { limit: parseInt(q.limit) }),
-      });
-      return { success: true, data: result };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const data = await controller.movements(ctx, request.query);
+      sendSuccess(reply, data);
     },
   );
 
@@ -167,9 +152,10 @@ export default async function inventoryRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const items = await getLowStock(request.tenant.schema, request.query.locationId);
-      return { success: true, data: items };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const data = await controller.lowStock(ctx, request.query.locationId);
+      sendSuccess(reply, data);
     },
   );
 }

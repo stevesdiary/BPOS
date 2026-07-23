@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
-import { getOnboardingStatus } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 export default async function onboardingRoutes(app: FastifyInstance) {
   // ─── GET /onboarding — merchant setup checklist ──────────────────────────
@@ -38,9 +40,10 @@ export default async function onboardingRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const status = await getOnboardingStatus(request.tenant.tenantId, request.tenant.schema);
-      return { success: true, data: status };
+    async (request, reply) => {
+      const ctx = createContext(request);
+      const status = await controller.getStatus(ctx);
+      sendSuccess(reply, status);
     },
   );
 }

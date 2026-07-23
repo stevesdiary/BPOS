@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { generateInvoice, getInvoice, listInvoices } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('invoicing:generate')];
 
@@ -27,12 +29,9 @@ export default async function invoicingRoutes(app: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
-    const invoice = await generateInvoice(
-      request.tenant.schema,
-      request.tenant.tenantId,
-      request.body.orderId,
-    );
-    return reply.status(201).send({ success: true, data: invoice });
+    const ctx = createContext(request);
+    const invoice = await controller.create(ctx, request.body);
+    sendCreated(reply, invoice);
   });
 
   // ─── GET /invoices — list invoices (optionally filter by orderId) ────────────
@@ -49,9 +48,10 @@ export default async function invoicingRoutes(app: FastifyInstance) {
         },
       },
     },
-  }, async (request) => {
-    const items = await listInvoices(request.tenant.schema, request.query.orderId);
-    return { success: true, data: items };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const items = await controller.list(ctx, request.query);
+    sendSuccess(reply, items);
   });
 
   // ─── GET /invoices/:id — get invoice with order details ─────────────────────
@@ -67,8 +67,9 @@ export default async function invoicingRoutes(app: FastifyInstance) {
         properties: { id: { type: 'string' } },
       },
     },
-  }, async (request) => {
-    const invoice = await getInvoice(request.tenant.schema, request.params.id);
-    return { success: true, data: invoice };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const invoice = await controller.get(ctx, request.params.id);
+    sendSuccess(reply, invoice);
   });
 }

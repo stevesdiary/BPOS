@@ -2,14 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
-import { db } from '../../shared/db/client.js';
-import { tenants } from '../../shared/db/schema/public.js';
-import { eq } from 'drizzle-orm';
-import {
-  getSubscription,
-  initiateSubscription,
-  cancelSubscription,
-} from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('subscriptions:manage')];
 
@@ -22,9 +17,10 @@ export default async function subscriptionsRoutes(app: FastifyInstance) {
       summary: 'Get current subscription status and plan tier',
       security: [{ bearerAuth: [] }],
     },
-  }, async (request) => {
-    const sub = await getSubscription(request.tenant.schema);
-    return { success: true, data: sub };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const sub = await controller.getSubscriptionHandler(ctx);
+    sendSuccess(reply, sub);
   });
 
   // ─── POST /subscriptions/initiate ─────────────────────────────────────────
@@ -50,22 +46,10 @@ export default async function subscriptionsRoutes(app: FastifyInstance) {
         additionalProperties: false,
       },
     },
-  }, async (request) => {
-    const [tenant] = await db
-      .select({ businessEmail: tenants.businessEmail })
-      .from(tenants)
-      .where(eq(tenants.id, request.tenant.tenantId))
-      .limit(1);
-
-    const email = tenant?.businessEmail ?? request.user.email;
-
-    const result = await initiateSubscription(
-      request.tenant.schema,
-      request.tenant.tenantId,
-      request.body.planTier,
-      email,
-    );
-    return { success: true, data: result };
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const result = await controller.initiateSubscriptionHandler(ctx, request.body);
+    sendCreated(reply, result);
   });
 
   // ─── POST /subscriptions/cancel ───────────────────────────────────────────
@@ -77,7 +61,8 @@ export default async function subscriptionsRoutes(app: FastifyInstance) {
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {
-    await cancelSubscription(request.tenant.schema, request.tenant.tenantId);
-    return reply.status(200).send({ success: true });
+    const ctx = createContext(request);
+    await controller.cancelSubscriptionHandler(ctx);
+    sendSuccess(reply, null);
   });
 }

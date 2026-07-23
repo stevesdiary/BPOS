@@ -4,9 +4,10 @@ import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { paystackGateway } from '../../shared/payments/paystack.js';
 import { flutterwaveGateway } from '../../shared/payments/flutterwave.js';
-import { initiatePayment, handlePaystackWebhook } from './service.js';
+import { createContext } from '../../shared/http/context.js';
+import { sendCreated, sendSuccess } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 import type { PaystackWebhookData } from './service.js';
-import { handleSubscriptionBillingWebhook } from '../subscriptions/service.js';
 
 interface WebhookRequest extends FastifyRequest {
   rawBody: string;
@@ -48,14 +49,9 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { orderId, email } = request.body as { orderId: string; email: string };
-      const result = await initiatePayment(
-        request.tenant.schema,
-        orderId,
-        request.user.sub,
-        email,
-      );
-      return reply.code(201).send({ success: true, data: result });
+      const ctx = createContext(request);
+      const result = await controller.initiate(ctx, request.body as { orderId: string; email: string });
+      sendCreated(reply, result);
     },
   );
 
@@ -103,29 +99,11 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
         const schemaName = (meta['schemaName'] as string | undefined) ?? '';
         if (!schemaName) {
           // Unknown tenant — acknowledge receipt but take no action
-          return reply.send({ success: true });
+          return sendSuccess(reply, undefined);
         }
 
-        // Route: subscription billing events vs order payment events
-        if (meta['type'] === 'subscription') {
-          const tenantId = (meta['tenantId'] as string | undefined) ?? '';
-          const planTier = (meta['planTier'] as string | undefined) ?? '';
-          const rawData = payload.data as unknown as Record<string, unknown>;
-          const authorization = rawData['authorization'] as Record<string, unknown> | undefined;
-          const customer = rawData['customer'] as Record<string, unknown> | undefined;
-          await handleSubscriptionBillingWebhook(
-            payload.event,
-            tenantId,
-            schemaName,
-            planTier as 'entry' | 'growth' | 'enterprise',
-            (authorization?.['authorization_code'] as string | undefined) ?? '',
-            (customer?.['customer_code'] as string | undefined) ?? '',
-          ).catch(() => {});
-        } else {
-          await handlePaystackWebhook(schemaName, payload.event, payload.data);
-        }
-
-        return reply.send({ success: true });
+        await controller.handleWebhook(schemaName, payload.event, payload.data, meta);
+        return sendSuccess(reply, undefined);
       },
     );
 
@@ -151,23 +129,23 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
 
         const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
         const schemaName = (meta['schemaName'] as string | undefined) ?? '';
-        if (!schemaName) return reply.send({ success: true });
+        if (!schemaName) return sendSuccess(reply, undefined);
 
         // Normalise Flutterwave event → shared handler
         // charge.completed → charge.success; other events silently acknowledged
         if (payload.event === 'charge.completed' && payload.data?.status === 'successful') {
           const reference = payload.data.txRef ?? payload.data.tx_ref ?? '';
-          await handlePaystackWebhook(schemaName, 'charge.success', {
+          await controller.handleWebhook(schemaName, 'charge.success', {
             id: payload.data.id ?? 0,
             reference,
             amount: Math.round((payload.data.amount ?? 0) * 100),  // NGN → kobo
             fees: Math.round((payload.data.app_fee ?? 0) * 100),
             status: 'success',
             metadata: meta as { orderId?: string; schemaName?: string },
-          });
+          }, meta);
         }
 
-        return reply.send({ success: true });
+        return sendSuccess(reply, undefined);
       },
     );
   });

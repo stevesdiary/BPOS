@@ -1,16 +1,7 @@
 import type { FastifyInstance } from 'fastify';
-import { db } from '../../shared/db/client.js';
-import { tenants } from '../../shared/db/schema/public.js';
-import { eq } from 'drizzle-orm';
-import { NotFoundError } from '../../shared/errors/types.js';
 import { requireAuth } from '../../shared/middleware/auth.js';
-import {
-  loginUser,
-  refreshAccessToken,
-  revokeRefreshToken,
-  requestPasswordReset,
-  resetPassword,
-} from './service.js';
+import { sendSuccess } from '../../shared/http/response.js';
+import * as controller from './controller.js';
 
 const loginBody = {
   type: 'object',
@@ -71,21 +62,9 @@ export default async function authRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const { tenantSlug, email, password } = request.body;
-
-      const [tenant] = await db
-        .select({ id: tenants.id, schemaName: tenants.schemaName })
-        .from(tenants)
-        .where(eq(tenants.slug, tenantSlug))
-        .limit(1);
-
-      if (!tenant) {
-        throw new NotFoundError('Tenant');
-      }
-
-      const result = await loginUser(app, tenant.id, tenant.schemaName, email, password);
-      return { success: true, data: result };
+    async (request, reply) => {
+      const result = await controller.login(app, request.body);
+      sendSuccess(reply, result);
     },
   );
 
@@ -101,26 +80,9 @@ export default async function authRoutes(app: FastifyInstance) {
         body: refreshBody,
       },
     },
-    async (request) => {
-      const { tenantSlug, refreshToken } = request.body;
-
-      const [tenant] = await db
-        .select({ id: tenants.id, schemaName: tenants.schemaName })
-        .from(tenants)
-        .where(eq(tenants.slug, tenantSlug))
-        .limit(1);
-
-      if (!tenant) {
-        throw new NotFoundError('Tenant');
-      }
-
-      const accessToken = await refreshAccessToken(
-        app,
-        tenant.id,
-        tenant.schemaName,
-        refreshToken,
-      );
-      return { success: true, data: { accessToken } };
+    async (request, reply) => {
+      const result = await controller.refresh(app, request.body);
+      sendSuccess(reply, result);
     },
   );
 
@@ -141,10 +103,10 @@ export default async function authRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
+    async (request, reply) => {
       const body = request.body as { refreshToken: string };
-      await revokeRefreshToken(request.user.tenantId, body.refreshToken);
-      return { success: true, data: { message: 'Logged out successfully' } };
+      const result = await controller.logout(request.user.tenantId, body.refreshToken);
+      sendSuccess(reply, result);
     },
   );
 
@@ -158,16 +120,9 @@ export default async function authRoutes(app: FastifyInstance) {
         security: [{ bearerAuth: [] }],
       },
     },
-    async (request) => {
-      return {
-        success: true,
-        data: {
-          userId: request.user.userId,
-          tenantId: request.user.tenantId,
-          email: request.user.email,
-          role: request.user.role,
-        },
-      };
+    async (request, reply) => {
+      const result = controller.me(request.user);
+      sendSuccess(reply, result);
     },
   );
 
@@ -197,39 +152,9 @@ export default async function authRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const { tenantSlug, email } = request.body;
-
-      const [tenant] = await db
-        .select({ id: tenants.id, schemaName: tenants.schemaName })
-        .from(tenants)
-        .where(eq(tenants.slug, tenantSlug))
-        .limit(1);
-
-      if (!tenant) {
-        // Still return success to prevent tenant enumeration
-        return {
-          success: true,
-          data: { message: 'If the email exists, a reset link has been sent' },
-        };
-      }
-
-      const result = await requestPasswordReset(tenant.id, tenant.schemaName, email);
-
-      // In a real implementation, send email here with result.rawToken
-      // For now, just log the token (development only)
-      if (result) {
-        request.log.info(
-          { token: result.rawToken, email: result.userEmail },
-          'Password reset token generated (dev only — would be sent via email in production)',
-        );
-      }
-
-      // Always return the same response to prevent email enumeration
-      return {
-        success: true,
-        data: { message: 'If the email exists, a reset link has been sent' },
-      };
+    async (request, reply) => {
+      const result = await controller.forgotPassword(request.body, request.log);
+      sendSuccess(reply, result);
     },
   );
 
@@ -256,25 +181,9 @@ export default async function authRoutes(app: FastifyInstance) {
         },
       },
     },
-    async (request) => {
-      const { tenantSlug, token, newPassword } = request.body;
-
-      const [tenant] = await db
-        .select({ id: tenants.id, schemaName: tenants.schemaName })
-        .from(tenants)
-        .where(eq(tenants.slug, tenantSlug))
-        .limit(1);
-
-      if (!tenant) {
-        throw new NotFoundError('Tenant');
-      }
-
-      await resetPassword(tenant.id, tenant.schemaName, token, newPassword);
-
-      return {
-        success: true,
-        data: { message: 'Password reset successful. Please login with your new password.' },
-      };
+    async (request, reply) => {
+      const result = await controller.reset(request.body);
+      sendSuccess(reply, result);
     },
   );
 }

@@ -63,6 +63,13 @@ const envSchema = z.object({
   // Alerting (optional — Slack notifications for server errors)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
 
+  // Sentry (optional — exception tracking)
+  SENTRY_DSN: z.string().url().optional(),
+
+  // Axiom (optional — structured log drain)
+  AXIOM_TOKEN: z.string().optional(),
+  AXIOM_DATASET: z.string().default('bpos-production'),
+
   // Email (optional — invoice delivery via Resend; emails skipped when not set)
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),

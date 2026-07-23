@@ -13,6 +13,8 @@ import swaggerPlugin from './plugins/swagger.js';
 import rateLimitPlugin from './plugins/rate-limit.js';
 import metricsPlugin from './plugins/metrics.js';
 import multipartPlugin from './plugins/multipart.js';
+import { sentryPlugin } from './plugins/sentry.js';
+import { createAxiomLogger } from './plugins/axiom.js';
 
 // Module routes
 import authRoutes from './modules/auth/routes.js';
@@ -36,10 +38,13 @@ import uploadsRoutes from './modules/uploads/routes.js';
 import shippingRoutes from './modules/shipping/routes.js';
 
 export function buildApp() {
+  const axiomTransport = createAxiomLogger();
+
   const app = Fastify({
     logger: {
       level: env.NODE_ENV === 'test' ? 'silent' : 'info',
-      ...(env.NODE_ENV === 'development'
+      ...(axiomTransport ? { transport: axiomTransport } : {}),
+      ...(env.NODE_ENV === 'development' && !axiomTransport
         ? {
             transport: {
               target: 'pino-pretty',
@@ -63,6 +68,7 @@ export function buildApp() {
   app.setErrorHandler(errorHandler);
 
   // Core plugins (order matters)
+  void app.register(fp(sentryPlugin));
   void app.register(fp(helmetPlugin));
   void app.register(fp(corsPlugin));
   void app.register(fp(rateLimitPlugin));

@@ -149,7 +149,7 @@ describe('Payments API', () => {
     expect(body.success).toBe(true);
   });
 
-  it('POST /v1/payments/webhook/paystack returns 401 for invalid signature', async () => {
+  it('POST /v1/payments/webhook/paystack returns 200 for invalid signature (webhook best practice)', async () => {
     const payload = JSON.stringify({
       event: 'charge.success',
       data: { id: 'evt-002', reference: 'bpos-ref-002', amount: 50000 },
@@ -165,9 +165,9 @@ describe('Payments API', () => {
       payload,
     });
 
-    expect(response.statusCode).toBe(401);
-    const body = response.json<{ error: { code: string } }>();
-    expect(body.error.code).toBe('UNAUTHORIZED');
+    expect(response.statusCode).toBe(200);
+    const body = response.json<{ received: boolean }>();
+    expect(body.received).toBe(true);
   });
 
   it('POST /v1/payments/webhook/paystack handles charge.failed event', async () => {

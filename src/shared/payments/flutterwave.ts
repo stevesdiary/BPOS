@@ -79,7 +79,10 @@ export const flutterwaveGateway: PaymentGateway = {
   validateWebhookSignature(_rawBody: string, signature: string): boolean {
     const secret = env.FLUTTERWAVE_WEBHOOK_SECRET;
     if (!secret) return false;
-    // Flutterwave sends verif-hash header which is the literal secret (not HMAC)
-    return crypto.timingSafeEqual(Buffer.from(secret, 'utf-8'), Buffer.from(signature, 'utf-8'));
+    try {
+      return crypto.timingSafeEqual(Buffer.from(secret, 'utf-8'), Buffer.from(signature, 'utf-8'));
+    } catch {
+      return false;
+    }
   },
 };

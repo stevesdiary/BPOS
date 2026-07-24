@@ -20,8 +20,8 @@ import type { RequestContext } from '../types/controller.js';
 export function createContext(request: FastifyRequest): RequestContext {
   return {
     schema: request.tenant.schema,
-    tenantId: request.user.tenantId,
-    userId: request.user.userId,
+    tenantId: request.user.tid,
+    userId: request.user.sub,
     role: request.user.role,
     email: request.user.email,
   };

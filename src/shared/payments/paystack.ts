@@ -73,7 +73,10 @@ export const paystackGateway: PaymentGateway = {
       .createHmac('sha512', env.PAYSTACK_SECRET_KEY)
       .update(rawBody)
       .digest('hex');
-    // Constant-time comparison to prevent timing attacks
-    return crypto.timingSafeEqual(Buffer.from(expected, 'utf-8'), Buffer.from(signature, 'utf-8'));
+    try {
+      return crypto.timingSafeEqual(Buffer.from(expected, 'utf-8'), Buffer.from(signature, 'utf-8'));
+    } catch {
+      return false;
+    }
   },
 };

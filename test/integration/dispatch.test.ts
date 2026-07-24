@@ -79,10 +79,10 @@ describe('POST /v1/dispatch/configure', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { success: boolean; provider: string; webhookUrl: string };
+    const body = res.json() as { success: boolean; data: { provider: string; webhookUrl: string } };
     expect(body.success).toBe(true);
-    expect(body.provider).toBe('traka');
-    expect(body.webhookUrl).toContain('/v1/dispatch/webhook/traka/tenant-test');
+    expect(body.data.provider).toBe('traka');
+    expect(body.data.webhookUrl).toContain('/v1/dispatch/webhook/traka/tenant-test');
   });
 
   it('returns 401 when unauthenticated (valid body, no token)', async () => {
@@ -118,9 +118,9 @@ describe('GET /v1/dispatch/config', () => {
       headers: { authorization: `Bearer ${staffToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { providerName: string; apiKey: string };
-    expect(body.providerName).toBe('traka');
-    expect(body.apiKey).toBe('****'); // never expose plaintext
+    const body = res.json() as { success: boolean; data: { providerName: string; apiKey: string } };
+    expect(body.data.providerName).toBe('traka');
+    expect(body.data.apiKey).toBe('****'); // never expose plaintext
   });
 });
 
@@ -137,9 +137,9 @@ describe('POST /v1/dispatch/quote', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { feeKobo: number; estimatedMinutes: number };
-    expect(body.feeKobo).toBe(150000);
-    expect(body.estimatedMinutes).toBe(120);
+    const body = res.json() as { success: boolean; data: { feeKobo: number; estimatedMinutes: number } };
+    expect(body.data.feeKobo).toBe(150000);
+    expect(body.data.estimatedMinutes).toBe(120);
   });
 
   it('returns 400 for missing required fields', async () => {
@@ -167,9 +167,9 @@ describe('POST /v1/dispatch/:orderId/dispatch', () => {
       },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { trackingNumber: string; logisticsReference: string };
-    expect(body.trackingNumber).toBe('TRK-123456');
-    expect(body.logisticsReference).toBe('traka-order-abc');
+    const body = res.json() as { success: boolean; data: { trackingNumber: string; logisticsReference: string } };
+    expect(body.data.trackingNumber).toBe('TRK-123456');
+    expect(body.data.logisticsReference).toBe('traka-order-abc');
   });
 });
 
@@ -181,9 +181,9 @@ describe('GET /v1/dispatch/:orderId/track', () => {
       headers: { authorization: `Bearer ${staffToken}` },
     });
     expect(res.statusCode).toBe(200);
-    const body = res.json() as { status: string; location: string };
-    expect(body.status).toBe('in_transit');
-    expect(body.location).toBe('Lagos Mainland Hub');
+    const body = res.json() as { success: boolean; data: { status: string; location: string } };
+    expect(body.data.status).toBe('in_transit');
+    expect(body.data.location).toBe('Lagos Mainland Hub');
   });
 });
 

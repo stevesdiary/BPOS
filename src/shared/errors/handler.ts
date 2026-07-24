@@ -6,7 +6,7 @@ export function errorHandler(
   error: FastifyError | Error,
   request: FastifyRequest,
   reply: FastifyReply,
-) {
+): void {
   const logger = request.log;
 
   if (error instanceof AppError) {
@@ -22,7 +22,7 @@ export function errorHandler(
         ...(error.stack !== undefined ? { stack: error.stack } : {}),
       });
     }
-    return reply.status(error.statusCode).send({
+    reply.status(error.statusCode).send({
       success: false,
       error: {
         code: error.code,
@@ -30,13 +30,14 @@ export function errorHandler(
         ...(error.details !== undefined ? { details: error.details } : {}),
       },
     });
+    return;
   }
 
   // Fastify validation errors (from route schema)
   const fastifyError = error as FastifyError;
   if (fastifyError.validation) {
     logger.warn({ err: error }, 'Request validation failed');
-    return reply.status(400).send({
+    reply.status(400).send({
       success: false,
       error: {
         code: 'VALIDATION_ERROR',
@@ -44,6 +45,7 @@ export function errorHandler(
         details: fastifyError.validation,
       },
     });
+    return;
   }
 
   logger.error({ err: error }, 'Unhandled error');
@@ -55,7 +57,7 @@ export function errorHandler(
     requestId: request.id,
     ...(error.stack !== undefined ? { stack: error.stack } : {}),
   });
-  return reply.status(500).send({
+  reply.status(500).send({
     success: false,
     error: {
       code: 'INTERNAL_ERROR',

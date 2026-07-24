@@ -2,6 +2,7 @@ import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+import { jsonSchemaTransform } from '@fastify/type-provider-zod';
 import { env } from '../config/env.js';
 
 async function swaggerPlugin(app: FastifyInstance) {
@@ -50,6 +51,7 @@ async function swaggerPlugin(app: FastifyInstance) {
         { name: 'Uploads', description: 'Image upload and compression' },
       ],
     },
+    transform: jsonSchemaTransform,
   });
 
   if (env.SWAGGER_ENABLED) {

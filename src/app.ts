@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import fp from 'fastify-plugin';
 import jwtPlugin from '@fastify/jwt';
+import { validatorCompiler, serializerCompiler } from '@fastify/type-provider-zod';
 import { env } from './config/env.js';
 import { errorHandler } from './shared/errors/handler.js';
 import { registerRequestId } from './shared/middleware/request-id.js';
@@ -65,7 +66,10 @@ export function buildApp() {
     },
   });
 
-  app.setErrorHandler(errorHandler);
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+
+  app.setErrorHandler(errorHandler as Parameters<typeof app.setErrorHandler>[0]);
 
   // Core plugins (order matters)
   void app.register(fp(sentryPlugin));

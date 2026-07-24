@@ -1,45 +1,29 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { createContext } from '../../shared/http/context.js';
 import { sendSuccess, sendCreated } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import {
+  createExpenseBodySchema,
+  listExpensesQuerySchema,
+  idParamsSchema,
+} from './validators.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('expenses:track')];
 
-export default async function expensesRoutes(app: FastifyInstance) {
-  app.post<{
-    Body: {
-      description: string;
-      amountKobo: number;
-      category: string;
-      expenseDate: string;
-      locationId?: string;
-      receiptUrl?: string;
-    };
-  }>('/', {
+export default function expensesRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.post('/', {
     preHandler: guard,
     schema: {
       tags: ['Expenses'],
       summary: 'Record an expense',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['description', 'amountKobo', 'category', 'expenseDate'],
-        properties: {
-          description: { type: 'string', minLength: 1 },
-          amountKobo: { type: 'integer', minimum: 1 },
-          category: {
-            type: 'string',
-            enum: ['rent', 'utilities', 'salaries', 'marketing', 'supplies', 'transport', 'other'],
-          },
-          expenseDate: { type: 'string', format: 'date-time' },
-          locationId: { type: 'string' },
-          receiptUrl: { type: 'string' },
-        },
-        additionalProperties: false,
-      },
+      body: createExpenseBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -47,32 +31,13 @@ export default async function expensesRoutes(app: FastifyInstance) {
     sendCreated(reply, expense);
   });
 
-  app.get<{
-    Querystring: {
-      page?: string;
-      limit?: string;
-      category?: string;
-      locationId?: string;
-      from?: string;
-      to?: string;
-    };
-  }>('/', {
+  typed.get('/', {
     preHandler: guard,
     schema: {
       tags: ['Expenses'],
       summary: 'List expenses (paginated)',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          page: { type: 'string' },
-          limit: { type: 'string' },
-          category: { type: 'string' },
-          locationId: { type: 'string' },
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: listExpensesQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -80,17 +45,13 @@ export default async function expensesRoutes(app: FastifyInstance) {
     sendSuccess(reply, result);
   });
 
-  app.get<{ Params: { id: string } }>('/:id', {
+  typed.get('/:id', {
     preHandler: guard,
     schema: {
       tags: ['Expenses'],
       summary: 'Get an expense record',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);

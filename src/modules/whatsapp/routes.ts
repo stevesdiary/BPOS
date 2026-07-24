@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { env } from '../../config/env.js';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
@@ -8,6 +9,10 @@ import { sendMessage } from '../../shared/http/response.js';
 import * as controller from './controller.js';
 import { getTenantForPhoneId } from './session.js';
 import { handleInboundMessage } from './handler.js';
+import {
+  webhookVerifyQuerySchema,
+  setupBodySchema,
+} from './validators.js';
 
 interface RawBodyRequest extends FastifyRequest {
   rawBody: string;
@@ -55,40 +60,25 @@ interface MetaWebhookPayload {
 }
 
 export default async function whatsappRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
   // ─── GET /whatsapp/webhook — Meta challenge-response verification ────────────
-  app.get<{
-    Querystring: {
-      'hub.mode': string;
-      'hub.verify_token': string;
-      'hub.challenge': string;
-    };
-  }>(
-    '/webhook',
-    {
-      schema: {
-        tags: ['WhatsApp'],
-        summary: 'Meta webhook verification endpoint',
-        description: 'Responds to Meta hub challenge. Set WHATSAPP_VERIFY_TOKEN in env.',
-        querystring: {
-          type: 'object',
-          properties: {
-            'hub.mode': { type: 'string' },
-            'hub.verify_token': { type: 'string' },
-            'hub.challenge': { type: 'string' },
-          },
-        },
-      },
+  typed.get('/webhook', {
+    schema: {
+      tags: ['WhatsApp'],
+      summary: 'Meta webhook verification endpoint',
+      description: 'Responds to Meta hub challenge. Set WHATSAPP_VERIFY_TOKEN in env.',
+      querystring: webhookVerifyQuerySchema,
     },
-    async (request, reply) => {
-      const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = request.query;
+  }, async (request, reply) => {
+    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = request.query;
 
-      if (mode === 'subscribe' && token === env.WHATSAPP_VERIFY_TOKEN) {
-        return reply.send(challenge);
-      }
+    if (mode === 'subscribe' && token === env.WHATSAPP_VERIFY_TOKEN) {
+      return reply.send(challenge);
+    }
 
-      return reply.code(403).send({ error: 'Forbidden' });
-    },
-  );
+    return reply.code(403).send({ error: 'Forbidden' });
+  });
 
   // ─── POST /whatsapp/webhook — Inbound events ──────────────────────────────
   app.register(async function webhookScope(scope) {
@@ -113,56 +103,55 @@ export default async function whatsappRoutes(app: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        // Signature verification (only when app secret is configured)
-        if (env.WHATSAPP_APP_SECRET) {
-          const rawBody = (request as unknown as RawBodyRequest).rawBody ?? '';
-          const sigHeader = (request.headers['x-hub-signature-256'] as string | undefined) ?? '';
-          const expected = `sha256=${crypto.createHmac('sha256', env.WHATSAPP_APP_SECRET).update(rawBody).digest('hex')}`;
+        try {
+          if (env.WHATSAPP_APP_SECRET) {
+            const rawBody = (request as unknown as RawBodyRequest).rawBody ?? '';
+            const sigHeader = (request.headers['x-hub-signature-256'] as string | undefined) ?? '';
+            const expected = `sha256=${crypto.createHmac('sha256', env.WHATSAPP_APP_SECRET).update(rawBody).digest('hex')}`;
 
-          if (!crypto.timingSafeEqual(Buffer.from(expected, 'utf-8'), Buffer.from(sigHeader, 'utf-8'))) {
-            return reply.code(401).send({ error: 'Invalid signature' });
+            let sigValid = false;
+            try {
+              sigValid = crypto.timingSafeEqual(Buffer.from(expected, 'utf-8'), Buffer.from(sigHeader, 'utf-8'));
+            } catch {
+              sigValid = false;
+            }
+            if (!sigValid) {
+              request.log.warn({ ip: request.ip }, '[Webhook] Invalid WhatsApp signature');
+              return reply.code(200).send({ success: true });
+            }
           }
-        }
 
-        const payload = request.body as MetaWebhookPayload;
+          const payload = request.body as MetaWebhookPayload;
 
-        if (payload.object !== 'whatsapp_business_account') {
+          if (payload.object !== 'whatsapp_business_account') {
+            return reply.send({ success: true });
+          }
+
+          void processEntries(payload.entry);
+          return reply.send({ success: true });
+        } catch (err) {
+          request.log.error({ err }, '[Webhook] WhatsApp processing error');
           return reply.send({ success: true });
         }
-
-        // Process each entry (non-blocking — acknowledge immediately)
-        void processEntries(payload.entry);
-
-        // Meta requires a 200 response immediately
-        return reply.send({ success: true });
       },
     );
   });
 
   // ─── POST /whatsapp/setup — Register phone number ID → tenant ────────────
-  app.post<{ Body: { phoneNumberId: string } }>(
-    '/setup',
-    {
-      preHandler: [requireAuth, resolveTenant],
-      schema: {
-        tags: ['WhatsApp'],
-        summary: 'Register a WhatsApp phone number ID for this tenant',
-        description: 'Maps a Meta phone_number_id to this tenant so inbound messages are routed correctly.',
-        security: [{ bearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['phoneNumberId'],
-          properties: { phoneNumberId: { type: 'string' } },
-          additionalProperties: false,
-        },
-      },
+  typed.post('/setup', {
+    preHandler: [requireAuth, resolveTenant],
+    schema: {
+      tags: ['WhatsApp'],
+      summary: 'Register a WhatsApp phone number ID for this tenant',
+      description: 'Maps a Meta phone_number_id to this tenant so inbound messages are routed correctly.',
+      security: [{ bearerAuth: [] }],
+      body: setupBodySchema,
     },
-    async (request, reply) => {
-      const ctx = createContext(request);
-      const result = await controller.setup(ctx, request.body);
-      sendMessage(reply, result.message);
-    },
-  );
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const result = await controller.setup(ctx, request.body);
+    sendMessage(reply, result.message);
+  });
 }
 
 // ─── Process Meta webhook entries ─────────────────────────────────────────────

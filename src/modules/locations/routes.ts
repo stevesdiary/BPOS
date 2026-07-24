@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
@@ -6,12 +7,19 @@ import { requireManager } from '../../shared/middleware/auth.js';
 import { createContext } from '../../shared/http/context.js';
 import { sendSuccess, sendCreated } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import {
+  createLocationBodySchema,
+  updateLocationBodySchema,
+  idParamsSchema,
+} from './validators.js';
 
 const readGuard = [requireAuth, resolveTenant, requireFeature('locations:manage')];
 const writeGuard = [requireAuth, resolveTenant, requireFeature('locations:manage'), requireManager];
 
 export default async function locationsRoutes(app: FastifyInstance) {
-  app.get('/', {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.get('/', {
     preHandler: readGuard,
     schema: {
       tags: ['Locations'],
@@ -24,17 +32,13 @@ export default async function locationsRoutes(app: FastifyInstance) {
     sendSuccess(reply, items);
   });
 
-  app.get<{ Params: { id: string } }>('/:id', {
+  typed.get('/:id', {
     preHandler: readGuard,
     schema: {
       tags: ['Locations'],
       summary: 'Get a location',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -42,30 +46,13 @@ export default async function locationsRoutes(app: FastifyInstance) {
     sendSuccess(reply, loc);
   });
 
-  app.post<{
-    Body: {
-      name: string;
-      address?: string;
-      phone?: string;
-      isDefault?: boolean;
-    };
-  }>('/', {
+  typed.post('/', {
     preHandler: writeGuard,
     schema: {
       tags: ['Locations'],
       summary: 'Create a location',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['name'],
-        properties: {
-          name: { type: 'string', minLength: 1 },
-          address: { type: 'string' },
-          phone: { type: 'string' },
-          isDefault: { type: 'boolean' },
-        },
-        additionalProperties: false,
-      },
+      body: createLocationBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -73,37 +60,14 @@ export default async function locationsRoutes(app: FastifyInstance) {
     sendCreated(reply, loc);
   });
 
-  app.patch<{
-    Params: { id: string };
-    Body: Partial<{
-      name: string;
-      address: string | null;
-      phone: string | null;
-      isDefault: boolean;
-      isActive: boolean;
-    }>;
-  }>('/:id', {
+  typed.patch('/:id', {
     preHandler: writeGuard,
     schema: {
       tags: ['Locations'],
       summary: 'Update a location',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
-      body: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', minLength: 1 },
-          address: { type: ['string', 'null'] },
-          phone: { type: ['string', 'null'] },
-          isDefault: { type: 'boolean' },
-          isActive: { type: 'boolean' },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: updateLocationBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -111,17 +75,13 @@ export default async function locationsRoutes(app: FastifyInstance) {
     sendSuccess(reply, loc);
   });
 
-  app.delete<{ Params: { id: string } }>('/:id', {
+  typed.delete('/:id', {
     preHandler: writeGuard,
     schema: {
       tags: ['Locations'],
       summary: 'Deactivate a location',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);

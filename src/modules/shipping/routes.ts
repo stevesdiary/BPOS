@@ -1,19 +1,36 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { createContext } from '../../shared/http/context.js';
 import { sendSuccess, sendCreated } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import {
+  createZoneBodySchema,
+  updateZoneBodySchema,
+  idParamsSchema,
+  createMethodBodySchema,
+  updateMethodBodySchema,
+  addRateBodySchema,
+  rateParamsSchema,
+  addConditionBodySchema,
+  conditionParamsSchema,
+  createPickupBodySchema,
+  updatePickupBodySchema,
+  pickupListQuerySchema,
+  availableQuerySchema,
+} from './validators.js';
 
 const managerGuard = [requireAuth, resolveTenant];
 const shippingFeature = requireFeature('shipping:manage');
 
 export default async function shippingRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
 
   // ── Utility ──────────────────────────────────────────────────────────────────
 
-  app.get('/states', {
+  typed.get('/states', {
     schema: {
       tags: ['Shipping'],
       summary: 'List valid Nigerian state names for zone/rate configuration',
@@ -25,20 +42,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Shipping Zones ────────────────────────────────────────────────────────────
 
-  app.post<{ Body: { name: string; states: string[] } }>('/zones', {
+  typed.post('/zones', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Create a shipping zone (named group of Nigerian states)',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['name', 'states'],
-        properties: {
-          name: { type: 'string' },
-          states: { type: 'array', items: { type: 'string' }, minItems: 1 },
-        },
-      },
+      body: createZoneBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -46,7 +56,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendCreated(reply, zone);
   });
 
-  app.get('/zones', {
+  typed.get('/zones', {
     preHandler: managerGuard,
     schema: {
       tags: ['Shipping'],
@@ -59,20 +69,14 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, zones);
   });
 
-  app.patch<{ Params: { id: string }; Body: { name?: string; states?: string[] } }>('/zones/:id', {
+  typed.patch('/zones/:id', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Update a shipping zone',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
-      body: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          states: { type: 'array', items: { type: 'string' } },
-        },
-      },
+      params: idParamsSchema,
+      body: updateZoneBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -80,13 +84,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, { message: 'Zone updated' });
   });
 
-  app.delete<{ Params: { id: string } }>('/zones/:id', {
+  typed.delete('/zones/:id', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Delete a shipping zone',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -96,17 +100,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Shipping Methods ──────────────────────────────────────────────────────────
 
-  app.post<{
-    Body: {
-      name: string;
-      type: string;
-      description?: string;
-      estimatedDaysMin?: number;
-      estimatedDaysMax?: number;
-      flatRateKobo?: number;
-      isFreeAlways?: boolean;
-    };
-  }>('/methods', {
+  typed.post('/methods', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
@@ -121,21 +115,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
         'pick_up always returns NGN 0 — customer must also choose a pick-up location.',
       ].join(' '),
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['name', 'type'],
-        properties: {
-          name: { type: 'string' },
-          type: { type: 'string', enum: ['flat_rate', 'zone_rate', 'value_rate', 'weight_rate', 'automated', 'free', 'pick_up'] },
-          description: { type: 'string' },
-          estimatedDaysMin: { type: 'integer', minimum: 0 },
-          estimatedDaysMax: { type: 'integer', minimum: 0 },
-          flatRateKobo: { type: 'integer', minimum: 0 },
-          isFreeAlways: { type: 'boolean' },
-          merchantCostKobo: { type: 'integer', minimum: 0, description: 'The courier cost the merchant bears when offering free shipping. Not shown to customers. Used for cost tracking and P&L.' },
-        },
-        additionalProperties: false,
-      },
+      body: createMethodBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -143,7 +123,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendCreated(reply, method);
   });
 
-  app.get('/methods', {
+  typed.get('/methods', {
     preHandler: managerGuard,
     schema: {
       tags: ['Shipping'],
@@ -156,30 +136,14 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, methods);
   });
 
-  app.patch<{
-    Params: { id: string };
-    Body: { name?: string; description?: string; estimatedDaysMin?: number; estimatedDaysMax?: number; flatRateKobo?: number; isFreeAlways?: boolean; isActive?: boolean };
-  }>('/methods/:id', {
+  typed.patch('/methods/:id', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Update a shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
-      body: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          description: { type: 'string' },
-          estimatedDaysMin: { type: 'integer' },
-          estimatedDaysMax: { type: 'integer' },
-          flatRateKobo: { type: 'integer', minimum: 0 },
-          isFreeAlways: { type: 'boolean' },
-          merchantCostKobo: { type: 'integer', minimum: 0 },
-          isActive: { type: 'boolean' },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: updateMethodBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -189,30 +153,15 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Shipping Rates (zone / value / weight) ────────────────────────────────────
 
-  app.post<{
-    Params: { id: string };
-    Body: { feeKobo: number; zoneId?: string; minOrderValueKobo?: number; maxOrderValueKobo?: number; minWeightKg?: number; maxWeightKg?: number };
-  }>('/methods/:id/rates', {
+  typed.post('/methods/:id/rates', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Add a rate row to a zone_rate / value_rate / weight_rate method',
       description: 'For zone_rate: set zoneId (or omit for catch-all). For value_rate: set min/maxOrderValueKobo. For weight_rate: set min/maxWeightKg. maxOrderValueKobo / maxWeightKg can be omitted for "and above" tiers.',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
-      body: {
-        type: 'object',
-        required: ['feeKobo'],
-        properties: {
-          feeKobo: { type: 'integer', minimum: 0 },
-          zoneId: { type: 'string' },
-          minOrderValueKobo: { type: 'integer', minimum: 0 },
-          maxOrderValueKobo: { type: 'integer', minimum: 0 },
-          minWeightKg: { type: 'number', minimum: 0 },
-          maxWeightKg: { type: 'number', minimum: 0 },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: addRateBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -220,13 +169,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendCreated(reply, rate);
   });
 
-  app.get<{ Params: { id: string } }>('/methods/:id/rates', {
+  typed.get('/methods/:id/rates', {
     preHandler: managerGuard,
     schema: {
       tags: ['Shipping'],
       summary: 'List rate rows for a shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -234,13 +183,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, rates);
   });
 
-  app.delete<{ Params: { id: string; rateId: string } }>('/methods/:id/rates/:rateId', {
+  typed.delete('/methods/:id/rates/:rateId', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Remove a rate row from a shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' }, rateId: { type: 'string' } } },
+      params: rateParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -250,28 +199,14 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Free Shipping Conditions ───────────────────────────────────────────────────
 
-  app.post<{
-    Params: { id: string };
-    Body: { conditionType: string; thresholdKobo?: number; productId?: string; categoryId?: string; promoCode?: string };
-  }>('/methods/:id/conditions', {
+  typed.post('/methods/:id/conditions', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Add a condition to a free shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
-      body: {
-        type: 'object',
-        required: ['conditionType'],
-        properties: {
-          conditionType: { type: 'string', enum: ['always', 'min_order_value', 'product', 'category', 'promo_code'] },
-          thresholdKobo: { type: 'integer', minimum: 0 },
-          productId: { type: 'string' },
-          categoryId: { type: 'string' },
-          promoCode: { type: 'string' },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: addConditionBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -279,13 +214,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendCreated(reply, condition);
   });
 
-  app.get<{ Params: { id: string } }>('/methods/:id/conditions', {
+  typed.get('/methods/:id/conditions', {
     preHandler: managerGuard,
     schema: {
       tags: ['Shipping'],
       summary: 'List conditions for a free shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -293,13 +228,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, conditions);
   });
 
-  app.delete<{ Params: { id: string; conditionId: string } }>('/methods/:id/conditions/:conditionId', {
+  typed.delete('/methods/:id/conditions/:conditionId', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Remove a condition from a free shipping method',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' }, conditionId: { type: 'string' } } },
+      params: conditionParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -309,38 +244,13 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Pick-up Locations ─────────────────────────────────────────────────────────
 
-  app.post<{
-    Body: {
-      name: string;
-      locationType: string;
-      locationId?: string;
-      providerName?: string;
-      address: string;
-      state?: string;
-      phone?: string;
-      operatingHours?: string;
-    };
-  }>('/pickup-locations', {
+  typed.post('/pickup-locations', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Create a pick-up location (merchant branch or third-party collection point)',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['name', 'locationType', 'address'],
-        properties: {
-          name: { type: 'string' },
-          locationType: { type: 'string', enum: ['merchant_branch', 'third_party'] },
-          locationId: { type: 'string', description: 'Required when locationType=merchant_branch' },
-          providerName: { type: 'string', description: 'e.g. gig, dhl, kwik — for third_party' },
-          address: { type: 'string' },
-          state: { type: 'string' },
-          phone: { type: 'string' },
-          operatingHours: { type: 'string' },
-        },
-        additionalProperties: false,
-      },
+      body: createPickupBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -348,15 +258,12 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendCreated(reply, pl);
   });
 
-  app.get<{ Querystring: { state?: string } }>('/pickup-locations', {
+  typed.get('/pickup-locations', {
     schema: {
       tags: ['Shipping'],
       summary: 'List active pick-up locations (public — no auth required)',
       description: 'Called by the customer-facing storefront. Filter by Nigerian state with ?state=Lagos.',
-      querystring: {
-        type: 'object',
-        properties: { state: { type: 'string' } },
-      },
+      querystring: pickupListQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -364,28 +271,14 @@ export default async function shippingRoutes(app: FastifyInstance) {
     sendSuccess(reply, locs);
   });
 
-  app.patch<{
-    Params: { id: string };
-    Body: { name?: string; address?: string; state?: string; phone?: string; operatingHours?: string; isActive?: boolean };
-  }>('/pickup-locations/:id', {
+  typed.patch('/pickup-locations/:id', {
     preHandler: [...managerGuard, shippingFeature],
     schema: {
       tags: ['Shipping'],
       summary: 'Update a pick-up location',
       security: [{ bearerAuth: [] }],
-      params: { type: 'object', properties: { id: { type: 'string' } } },
-      body: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          address: { type: 'string' },
-          state: { type: 'string' },
-          phone: { type: 'string' },
-          operatingHours: { type: 'string' },
-          isActive: { type: 'boolean' },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: updatePickupBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -395,32 +288,12 @@ export default async function shippingRoutes(app: FastifyInstance) {
 
   // ── Checkout Calculator ───────────────────────────────────────────────────────
 
-  app.get<{
-    Querystring: {
-      orderValueKobo: string;
-      destinationState?: string;
-      totalWeightKg?: string;
-      promoCode?: string;
-      itemProductIds?: string;
-      itemCategoryIds?: string;
-    };
-  }>('/available', {
+  typed.get('/available', {
     schema: {
       tags: ['Shipping'],
       summary: 'Get available shipping methods and fees for a given checkout context',
       description: 'Called at checkout after the customer provides their delivery details. Returns options sorted cheapest-first. automated methods are excluded — use GET /shipping/quote for live provider quotes.',
-      querystring: {
-        type: 'object',
-        required: ['orderValueKobo'],
-        properties: {
-          orderValueKobo: { type: 'string', description: 'Cart total in kobo (before delivery fee)' },
-          destinationState: { type: 'string', description: 'Nigerian state name — required for zone_rate methods' },
-          totalWeightKg: { type: 'string', description: 'Total order weight in kg — required for weight_rate methods' },
-          promoCode: { type: 'string' },
-          itemProductIds: { type: 'string', description: 'Comma-separated product IDs in cart' },
-          itemCategoryIds: { type: 'string', description: 'Comma-separated category IDs in cart' },
-        },
-      },
+      querystring: availableQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
@@ -8,52 +9,29 @@ import { createContext } from '../../shared/http/context.js';
 import { sendCreated, sendSuccess } from '../../shared/http/response.js';
 import * as controller from './controller.js';
 import type { PaystackWebhookData } from './service.js';
+import { initiatePaymentBodySchema } from './validators.js';
 
 interface WebhookRequest extends FastifyRequest {
   rawBody: string;
 }
 
 export default async function paymentsRoutes(fastify: FastifyInstance) {
+  const typed = fastify.withTypeProvider<ZodTypeProvider>();
+
   // ─── POST /payments/initiate ──────────────────────────────────────────────
-  fastify.post(
-    '/initiate',
-    {
-      preHandler: [requireAuth, resolveTenant, requireFeature('orders:create')],
-      schema: {
-        tags: ['Payments'],
-        summary: 'Initiate a Paystack payment for an order',
-        security: [{ bearerAuth: [] }],
-        body: {
-          type: 'object',
-          required: ['orderId', 'email'],
-          properties: {
-            orderId: { type: 'string' },
-            email: { type: 'string', format: 'email' },
-          },
-        },
-        response: {
-          201: {
-            type: 'object',
-            properties: {
-              success: { type: 'boolean' },
-              data: {
-                type: 'object',
-                properties: {
-                  authorizationUrl: { type: 'string' },
-                  reference: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-      },
+  typed.post('/initiate', {
+    preHandler: [requireAuth, resolveTenant, requireFeature('orders:create')],
+    schema: {
+      tags: ['Payments'],
+      summary: 'Initiate a Paystack payment for an order',
+      security: [{ bearerAuth: [] }],
+      body: initiatePaymentBodySchema,
     },
-    async (request, reply) => {
-      const ctx = createContext(request);
-      const result = await controller.initiate(ctx, request.body as { orderId: string; email: string });
-      sendCreated(reply, result);
-    },
-  );
+  }, async (request, reply) => {
+    const ctx = createContext(request);
+    const result = await controller.initiate(ctx, request.body);
+    sendCreated(reply, result);
+  });
 
   // ─── POST /payments/webhook/paystack ─────────────────────────────────────
   // Webhook endpoint: unauthenticated, raw body required for HMAC verification.
@@ -85,25 +63,29 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const rawBody = (request as unknown as WebhookRequest).rawBody ?? '';
-        const signature = (request.headers['x-paystack-signature'] as string | undefined) ?? '';
+        try {
+          const rawBody = (request as unknown as WebhookRequest).rawBody ?? '';
+          const signature = (request.headers['x-paystack-signature'] as string | undefined) ?? '';
 
-        if (!paystackGateway.validateWebhookSignature(rawBody, signature)) {
-          return reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid webhook signature' } });
-        }
+          if (!paystackGateway.validateWebhookSignature(rawBody, signature)) {
+            request.log.warn({ ip: request.ip }, '[Webhook] Invalid Paystack signature');
+            return reply.code(200).send({ received: true });
+          }
 
-        const payload = request.body as { event: string; data: PaystackWebhookData };
+          const payload = request.body as { event: string; data: PaystackWebhookData };
 
-        // Resolve tenant from webhook metadata (set during payment initiation)
-        const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
-        const schemaName = (meta['schemaName'] as string | undefined) ?? '';
-        if (!schemaName) {
-          // Unknown tenant — acknowledge receipt but take no action
+          const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
+          const schemaName = (meta['schemaName'] as string | undefined) ?? '';
+          if (!schemaName) {
+            return sendSuccess(reply, undefined);
+          }
+
+          await controller.handleWebhook(schemaName, payload.event, payload.data, meta);
           return sendSuccess(reply, undefined);
+        } catch (err) {
+          request.log.error({ err }, '[Webhook] Paystack processing error');
+          return reply.code(200).send({ received: true });
         }
-
-        await controller.handleWebhook(schemaName, payload.event, payload.data, meta);
-        return sendSuccess(reply, undefined);
       },
     );
 
@@ -118,34 +100,38 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
         },
       },
       async (request, reply) => {
-        const rawBody = (request as unknown as WebhookRequest).rawBody ?? '';
-        const signature = (request.headers['verif-hash'] as string | undefined) ?? '';
+        try {
+          const rawBody = (request as unknown as WebhookRequest).rawBody ?? '';
+          const signature = (request.headers['verif-hash'] as string | undefined) ?? '';
 
-        if (!flutterwaveGateway.validateWebhookSignature(rawBody, signature)) {
-          return reply.code(401).send({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid webhook signature' } });
+          if (!flutterwaveGateway.validateWebhookSignature(rawBody, signature)) {
+            request.log.warn({ ip: request.ip }, '[Webhook] Invalid Flutterwave signature');
+            return reply.code(200).send({ received: true });
+          }
+
+          const payload = request.body as { event: string; data: { txRef?: string; tx_ref?: string; metadata?: Record<string, unknown>; id?: number; status?: string; amount?: number; app_fee?: number; flw_ref?: string; created_at?: string } };
+
+          const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
+          const schemaName = (meta['schemaName'] as string | undefined) ?? '';
+          if (!schemaName) return sendSuccess(reply, undefined);
+
+          if (payload.event === 'charge.completed' && payload.data?.status === 'successful') {
+            const reference = payload.data.txRef ?? payload.data.tx_ref ?? '';
+            await controller.handleWebhook(schemaName, 'charge.success', {
+              id: payload.data.id ?? 0,
+              reference,
+              amount: Math.round((payload.data.amount ?? 0) * 100),
+              fees: Math.round((payload.data.app_fee ?? 0) * 100),
+              status: 'success',
+              metadata: meta as { orderId?: string; schemaName?: string },
+            }, meta);
+          }
+
+          return sendSuccess(reply, undefined);
+        } catch (err) {
+          request.log.error({ err }, '[Webhook] Flutterwave processing error');
+          return reply.code(200).send({ received: true });
         }
-
-        const payload = request.body as { event: string; data: { txRef?: string; tx_ref?: string; metadata?: Record<string, unknown>; id?: number; status?: string; amount?: number; app_fee?: number; flw_ref?: string; created_at?: string } };
-
-        const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
-        const schemaName = (meta['schemaName'] as string | undefined) ?? '';
-        if (!schemaName) return sendSuccess(reply, undefined);
-
-        // Normalise Flutterwave event → shared handler
-        // charge.completed → charge.success; other events silently acknowledged
-        if (payload.event === 'charge.completed' && payload.data?.status === 'successful') {
-          const reference = payload.data.txRef ?? payload.data.tx_ref ?? '';
-          await controller.handleWebhook(schemaName, 'charge.success', {
-            id: payload.data.id ?? 0,
-            reference,
-            amount: Math.round((payload.data.amount ?? 0) * 100),  // NGN → kobo
-            fees: Math.round((payload.data.app_fee ?? 0) * 100),
-            status: 'success',
-            metadata: meta as { orderId?: string; schemaName?: string },
-          }, meta);
-        }
-
-        return sendSuccess(reply, undefined);
       },
     );
   });

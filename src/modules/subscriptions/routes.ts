@@ -1,16 +1,20 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { createContext } from '../../shared/http/context.js';
-import { sendSuccess, sendCreated } from '../../shared/http/response.js';
+import { sendSuccess } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import { initiateSubscriptionBodySchema } from './validators.js';
 
 const guard = [requireAuth, resolveTenant, requireFeature('subscriptions:manage')];
 
-export default async function subscriptionsRoutes(app: FastifyInstance) {
+export default function subscriptionsRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
   // ─── GET /subscriptions ────────────────────────────────────────────────────
-  app.get('/', {
+  typed.get('/', {
     preHandler: guard,
     schema: {
       tags: ['Subscriptions'],
@@ -24,7 +28,7 @@ export default async function subscriptionsRoutes(app: FastifyInstance) {
   });
 
   // ─── POST /subscriptions/initiate ─────────────────────────────────────────
-  app.post<{ Body: { planTier: 'entry' | 'growth' | 'enterprise' } }>('/initiate', {
+  typed.post('/initiate', {
     preHandler: guard,
     schema: {
       tags: ['Subscriptions'],
@@ -33,27 +37,16 @@ export default async function subscriptionsRoutes(app: FastifyInstance) {
         'Returns a Paystack authorization URL. On successful payment Paystack fires a ' +
         'charge.success webhook which activates the subscription automatically.',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['planTier'],
-        properties: {
-          planTier: {
-            type: 'string',
-            enum: ['entry', 'growth', 'enterprise'],
-            description: 'Target plan tier',
-          },
-        },
-        additionalProperties: false,
-      },
+      body: initiateSubscriptionBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.initiateSubscriptionHandler(ctx, request.body);
-    sendCreated(reply, result);
+    sendSuccess(reply, result);
   });
 
   // ─── POST /subscriptions/cancel ───────────────────────────────────────────
-  app.post('/cancel', {
+  typed.post('/cancel', {
     preHandler: guard,
     schema: {
       tags: ['Subscriptions'],

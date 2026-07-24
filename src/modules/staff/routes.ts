@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
@@ -6,12 +7,19 @@ import { requireManager } from '../../shared/middleware/auth.js';
 import { createContext } from '../../shared/http/context.js';
 import { sendSuccess, sendCreated } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import {
+  inviteStaffBodySchema,
+  updateStaffBodySchema,
+  idParamsSchema,
+} from './validators.js';
 
 const readGuard = [requireAuth, resolveTenant, requireFeature('staff:invite')];
 const writeGuard = [requireAuth, resolveTenant, requireFeature('staff:invite'), requireManager];
 
-export default async function staffRoutes(app: FastifyInstance) {
-  app.get('/', {
+export default function staffRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
+  typed.get('/', {
     preHandler: readGuard,
     schema: {
       tags: ['Staff'],
@@ -24,17 +32,13 @@ export default async function staffRoutes(app: FastifyInstance) {
     sendSuccess(reply, items);
   });
 
-  app.get<{ Params: { id: string } }>('/:id', {
+  typed.get('/:id', {
     preHandler: readGuard,
     schema: {
       tags: ['Staff'],
       summary: 'Get a staff member',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -42,36 +46,13 @@ export default async function staffRoutes(app: FastifyInstance) {
     sendSuccess(reply, member);
   });
 
-  app.post<{
-    Body: {
-      email: string;
-      firstName: string;
-      lastName: string;
-      role: 'manager' | 'staff' | 'viewer';
-      phone?: string;
-      locationId?: string;
-      temporaryPassword: string;
-    };
-  }>('/', {
+  typed.post('/invite', {
     preHandler: writeGuard,
     schema: {
       tags: ['Staff'],
       summary: 'Invite a staff member',
       security: [{ bearerAuth: [] }],
-      body: {
-        type: 'object',
-        required: ['email', 'firstName', 'lastName', 'role', 'temporaryPassword'],
-        properties: {
-          email: { type: 'string', format: 'email' },
-          firstName: { type: 'string', minLength: 1 },
-          lastName: { type: 'string', minLength: 1 },
-          role: { type: 'string', enum: ['manager', 'staff', 'viewer'] },
-          phone: { type: 'string' },
-          locationId: { type: 'string' },
-          temporaryPassword: { type: 'string', minLength: 8 },
-        },
-        additionalProperties: false,
-      },
+      body: inviteStaffBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -79,39 +60,14 @@ export default async function staffRoutes(app: FastifyInstance) {
     sendCreated(reply, member);
   });
 
-  app.patch<{
-    Params: { id: string };
-    Body: Partial<{
-      firstName: string;
-      lastName: string;
-      phone: string | null;
-      role: 'manager' | 'staff' | 'viewer';
-      locationId: string | null;
-      isActive: boolean;
-    }>;
-  }>('/:id', {
+  typed.patch('/:id', {
     preHandler: writeGuard,
     schema: {
       tags: ['Staff'],
       summary: 'Update a staff member',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
-      body: {
-        type: 'object',
-        properties: {
-          firstName: { type: 'string', minLength: 1 },
-          lastName: { type: 'string', minLength: 1 },
-          phone: { type: ['string', 'null'] },
-          role: { type: 'string', enum: ['manager', 'staff', 'viewer'] },
-          locationId: { type: ['string', 'null'] },
-          isActive: { type: 'boolean' },
-        },
-        additionalProperties: false,
-      },
+      params: idParamsSchema,
+      body: updateStaffBodySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -119,17 +75,13 @@ export default async function staffRoutes(app: FastifyInstance) {
     sendSuccess(reply, member);
   });
 
-  app.delete<{ Params: { id: string } }>('/:id', {
+  typed.delete('/:id', {
     preHandler: writeGuard,
     schema: {
       tags: ['Staff'],
       summary: 'Deactivate a staff member',
       security: [{ bearerAuth: [] }],
-      params: {
-        type: 'object',
-        required: ['id'],
-        properties: { id: { type: 'string' } },
-      },
+      params: idParamsSchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);

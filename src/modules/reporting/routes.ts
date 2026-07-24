@@ -1,14 +1,24 @@
 import type { FastifyInstance } from 'fastify';
+import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { requireAuth } from '../../shared/middleware/auth.js';
 import { resolveTenant } from '../../shared/middleware/tenant.js';
 import { requireFeature } from '../../shared/middleware/feature-gate.js';
 import { createContext } from '../../shared/http/context.js';
 import { sendSuccess, sendCsv } from '../../shared/http/response.js';
 import * as controller from './controller.js';
+import {
+  plReportQuerySchema,
+  bestSellersQuerySchema,
+  revenueByLocationQuerySchema,
+  staffSalesQuerySchema,
+  inventoryValuationQuerySchema,
+} from './validators.js';
 
 export default async function reportingRoutes(app: FastifyInstance) {
+  const typed = app.withTypeProvider<ZodTypeProvider>();
+
   // ─── P&L report ─────────────────────────────────────────────────────────────
-  app.get<{ Querystring: { from: string; to: string } }>('/pl', {
+  typed.get('/pl', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:pl')],
     schema: {
       tags: ['Reporting'],
@@ -17,14 +27,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
         'All figures derived from journal entries for the period. ' +
         'Revenue = account 4000 credits. Expenses = accounts 5000/5100/5200/5300 debits.',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        required: ['from', 'to'],
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: plReportQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -33,20 +36,13 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── Best-selling products ───────────────────────────────────────────────────
-  app.get<{ Querystring: { from?: string; to?: string; limit?: string } }>('/best-sellers', {
+  typed.get('/best-sellers', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:pl')],
     schema: {
       tags: ['Reporting'],
       summary: 'Best-selling products by quantity sold',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-          limit: { type: 'string' },
-        },
-      },
+      querystring: bestSellersQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -55,19 +51,13 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── Revenue by location ─────────────────────────────────────────────────────
-  app.get<{ Querystring: { from?: string; to?: string } }>('/revenue-by-location', {
+  typed.get('/revenue-by-location', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:revenue_by_location')],
     schema: {
       tags: ['Reporting'],
       summary: 'Revenue breakdown by location',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: revenueByLocationQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -76,19 +66,13 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── Staff sales report ──────────────────────────────────────────────────────
-  app.get<{ Querystring: { from?: string; to?: string } }>('/staff-sales', {
+  typed.get('/staff-sales', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:staff_sales')],
     schema: {
       tags: ['Reporting'],
       summary: 'Sales performance by staff member',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: staffSalesQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -97,20 +81,13 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── P&L export (CSV) ────────────────────────────────────────────────────────
-  app.get<{ Querystring: { from: string; to: string } }>('/pl/export', {
+  typed.get('/pl/export', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:pl')],
     schema: {
       tags: ['Reporting'],
       summary: 'Export P&L report as CSV',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        required: ['from', 'to'],
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: plReportQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -119,19 +96,13 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── Staff sales export (CSV) ─────────────────────────────────────────────────
-  app.get<{ Querystring: { from?: string; to?: string } }>('/staff-sales/export', {
+  typed.get('/staff-sales/export', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:staff_sales')],
     schema: {
       tags: ['Reporting'],
       summary: 'Export staff sales report as CSV',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          from: { type: 'string', format: 'date-time' },
-          to: { type: 'string', format: 'date-time' },
-        },
-      },
+      querystring: staffSalesQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
@@ -140,19 +111,14 @@ export default async function reportingRoutes(app: FastifyInstance) {
   });
 
   // ─── Inventory valuation ──────────────────────────────────────────────────────
-  app.get<{ Querystring: { format?: string } }>('/inventory-valuation', {
+  typed.get('/inventory-valuation', {
     preHandler: [requireAuth, resolveTenant, requireFeature('reporting:margin')],
     schema: {
       tags: ['Reporting'],
       summary: 'Inventory valuation (quantity × cost per variant per location)',
       description: 'Gated to manager+ via reporting:margin feature flag. Cost data is sensitive.',
       security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          format: { type: 'string', enum: ['json', 'csv'], default: 'json' },
-        },
-      },
+      querystring: inventoryValuationQuerySchema,
     },
   }, async (request, reply) => {
     const ctx = createContext(request);

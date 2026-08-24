@@ -29,7 +29,7 @@ export default function staffRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const items = await controller.list(ctx);
-    sendSuccess(reply, items);
+    return sendSuccess(reply, items);
   });
 
   typed.get('/:id', {
@@ -43,7 +43,7 @@ export default function staffRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const member = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, member);
+    return sendSuccess(reply, member);
   });
 
   typed.post('/invite', {
@@ -57,7 +57,7 @@ export default function staffRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const member = await controller.invite(ctx, request.body);
-    sendCreated(reply, member);
+    return sendCreated(reply, member);
   });
 
   typed.patch('/:id', {
@@ -72,7 +72,7 @@ export default function staffRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const member = await controller.update(ctx, request.params.id, request.body);
-    sendSuccess(reply, member);
+    return sendSuccess(reply, member);
   });
 
   typed.delete('/:id', {
@@ -86,6 +86,6 @@ export default function staffRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.deactivate(ctx, request.params.id);
-    reply.status(204).send();
+    return reply.status(204).send();
   });
 }

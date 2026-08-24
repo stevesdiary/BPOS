@@ -32,7 +32,7 @@ export default function invoicingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const invoice = await controller.create(ctx, request.body);
-    sendCreated(reply, invoice);
+    return sendCreated(reply, invoice);
   });
 
   // ─── GET /invoices — list invoices (optionally filter by orderId) ────────────
@@ -47,7 +47,7 @@ export default function invoicingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const items = await controller.list(ctx, request.query);
-    sendSuccess(reply, items);
+    return sendSuccess(reply, items);
   });
 
   // ─── GET /invoices/:id — get invoice with order details ─────────────────────
@@ -62,6 +62,6 @@ export default function invoicingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const invoice = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, invoice);
+    return sendSuccess(reply, invoice);
   });
 }

@@ -37,7 +37,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
       security: [{ bearerAuth: [] }],
     },
   }, async (_request, reply) => {
-    sendSuccess(reply, controller.getStates());
+    return sendSuccess(reply, controller.getStates());
   });
 
   // ── Shipping Zones ────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const zone = await controller.createZone(ctx, request.body);
-    sendCreated(reply, zone);
+    return sendCreated(reply, zone);
   });
 
   typed.get('/zones', {
@@ -66,7 +66,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const zones = await controller.listZones(ctx);
-    sendSuccess(reply, zones);
+    return sendSuccess(reply, zones);
   });
 
   typed.patch('/zones/:id', {
@@ -81,7 +81,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.updateZone(ctx, request.params.id, request.body);
-    sendSuccess(reply, { message: 'Zone updated' });
+    return sendSuccess(reply, { message: 'Zone updated' });
   });
 
   typed.delete('/zones/:id', {
@@ -95,7 +95,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.deleteZone(ctx, request.params.id);
-    sendSuccess(reply, { message: 'Zone deleted' });
+    return sendSuccess(reply, { message: 'Zone deleted' });
   });
 
   // ── Shipping Methods ──────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const method = await controller.createMethod(ctx, request.body as never);
-    sendCreated(reply, method);
+    return sendCreated(reply, method);
   });
 
   typed.get('/methods', {
@@ -133,7 +133,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const methods = await controller.listMethods(ctx);
-    sendSuccess(reply, methods);
+    return sendSuccess(reply, methods);
   });
 
   typed.patch('/methods/:id', {
@@ -148,7 +148,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.updateMethod(ctx, request.params.id, request.body);
-    sendSuccess(reply, { message: 'Method updated' });
+    return sendSuccess(reply, { message: 'Method updated' });
   });
 
   // ── Shipping Rates (zone / value / weight) ────────────────────────────────────
@@ -166,7 +166,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const rate = await controller.addRate(ctx, request.params.id, request.body);
-    sendCreated(reply, rate);
+    return sendCreated(reply, rate);
   });
 
   typed.get('/methods/:id/rates', {
@@ -180,7 +180,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const rates = await controller.listRates(ctx, request.params.id);
-    sendSuccess(reply, rates);
+    return sendSuccess(reply, rates);
   });
 
   typed.delete('/methods/:id/rates/:rateId', {
@@ -194,7 +194,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.deleteRate(ctx, request.params.rateId);
-    sendSuccess(reply, { message: 'Rate deleted' });
+    return sendSuccess(reply, { message: 'Rate deleted' });
   });
 
   // ── Free Shipping Conditions ───────────────────────────────────────────────────
@@ -211,7 +211,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const condition = await controller.addCondition(ctx, request.params.id, request.body);
-    sendCreated(reply, condition);
+    return sendCreated(reply, condition);
   });
 
   typed.get('/methods/:id/conditions', {
@@ -225,7 +225,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const conditions = await controller.listConditions(ctx, request.params.id);
-    sendSuccess(reply, conditions);
+    return sendSuccess(reply, conditions);
   });
 
   typed.delete('/methods/:id/conditions/:conditionId', {
@@ -239,7 +239,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.deleteCondition(ctx, request.params.conditionId);
-    sendSuccess(reply, { message: 'Condition deleted' });
+    return sendSuccess(reply, { message: 'Condition deleted' });
   });
 
   // ── Pick-up Locations ─────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const pl = await controller.createPickup(ctx, request.body);
-    sendCreated(reply, pl);
+    return sendCreated(reply, pl);
   });
 
   typed.get('/pickup-locations', {
@@ -268,7 +268,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const locs = await controller.listPickups(ctx, request.query);
-    sendSuccess(reply, locs);
+    return sendSuccess(reply, locs);
   });
 
   typed.patch('/pickup-locations/:id', {
@@ -283,7 +283,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.updatePickup(ctx, request.params.id, request.body);
-    sendSuccess(reply, { message: 'Pickup location updated' });
+    return sendSuccess(reply, { message: 'Pickup location updated' });
   });
 
   // ── Checkout Calculator ───────────────────────────────────────────────────────
@@ -298,6 +298,6 @@ export default async function shippingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const options = await controller.getAvailable(ctx, request.query);
-    sendSuccess(reply, options);
+    return sendSuccess(reply, options);
   });
 }

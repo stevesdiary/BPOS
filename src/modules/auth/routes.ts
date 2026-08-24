@@ -25,7 +25,7 @@ export default function authRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const result = await controller.login(app, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.post('/refresh', {
@@ -39,7 +39,7 @@ export default function authRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const result = await controller.refresh(app, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.post('/logout', {
@@ -52,7 +52,7 @@ export default function authRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const result = await controller.logout(request.user.tenantId, request.body.refreshToken);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.get('/me', {
@@ -64,7 +64,7 @@ export default function authRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const result = controller.me(request.user);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Password Reset ────────────────────────────────────────────────────────
@@ -83,8 +83,8 @@ export default function authRoutes(app: FastifyInstance) {
       body: forgotPasswordBodySchema,
     },
   }, async (request, reply) => {
-    const result = await controller.forgotPassword(request.body, request.log);
-    sendSuccess(reply, result);
+    const result = await controller.forgotPassword(request.body);
+    return sendSuccess(reply, result);
   });
 
   typed.post('/reset-password', {
@@ -100,6 +100,6 @@ export default function authRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const result = await controller.reset(request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 }

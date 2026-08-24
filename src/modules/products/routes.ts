@@ -36,7 +36,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const category = await controller.createCategoryHandler(ctx, request.body);
-    sendCreated(reply, category);
+    return sendCreated(reply, category);
   });
 
   typed.get('/categories', {
@@ -49,7 +49,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const cats = await controller.listCategoriesHandler(ctx);
-    sendSuccess(reply, cats);
+    return sendSuccess(reply, cats);
   });
 
   // ─── Products ──────────────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const product = await controller.createProductHandler(ctx, request.body);
-    sendCreated(reply, product);
+    return sendCreated(reply, product);
   });
 
   typed.get('/', {
@@ -79,7 +79,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.listProductsHandler(ctx, request.query);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.get('/:id', {
@@ -93,7 +93,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const product = await controller.getProductHandler(ctx, request.params.id);
-    sendSuccess(reply, product);
+    return sendSuccess(reply, product);
   });
 
   typed.patch('/:id', {
@@ -108,7 +108,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const product = await controller.updateProductHandler(ctx, request.params.id, request.body);
-    sendSuccess(reply, product);
+    return sendSuccess(reply, product);
   });
 
   // ─── Variants ──────────────────────────────────────────────────────────────
@@ -125,7 +125,7 @@ export default async function productsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const variant = await controller.createVariantHandler(ctx, request.params.id, request.body);
-    sendCreated(reply, variant);
+    return sendCreated(reply, variant);
   });
 
   typed.patch('/:id/variants/:vid', {
@@ -145,6 +145,6 @@ export default async function productsRoutes(app: FastifyInstance) {
       request.params.vid,
       request.body,
     );
-    sendSuccess(reply, variant);
+    return sendSuccess(reply, variant);
   });
 }

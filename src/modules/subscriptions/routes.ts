@@ -24,7 +24,7 @@ export default function subscriptionsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const sub = await controller.getSubscriptionHandler(ctx);
-    sendSuccess(reply, sub);
+    return sendSuccess(reply, sub);
   });
 
   // ─── POST /subscriptions/initiate ─────────────────────────────────────────
@@ -42,7 +42,7 @@ export default function subscriptionsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.initiateSubscriptionHandler(ctx, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── POST /subscriptions/cancel ───────────────────────────────────────────
@@ -56,6 +56,6 @@ export default function subscriptionsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.cancelSubscriptionHandler(ctx);
-    sendSuccess(reply, null);
+    return sendSuccess(reply, null);
   });
 }

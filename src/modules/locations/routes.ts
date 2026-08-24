@@ -29,7 +29,7 @@ export default async function locationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const items = await controller.list(ctx);
-    sendSuccess(reply, items);
+    return sendSuccess(reply, items);
   });
 
   typed.get('/:id', {
@@ -43,7 +43,7 @@ export default async function locationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const loc = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, loc);
+    return sendSuccess(reply, loc);
   });
 
   typed.post('/', {
@@ -57,7 +57,7 @@ export default async function locationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const loc = await controller.create(ctx, request.body);
-    sendCreated(reply, loc);
+    return sendCreated(reply, loc);
   });
 
   typed.patch('/:id', {
@@ -72,7 +72,7 @@ export default async function locationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const loc = await controller.update(ctx, request.params.id, request.body);
-    sendSuccess(reply, loc);
+    return sendSuccess(reply, loc);
   });
 
   typed.delete('/:id', {
@@ -86,6 +86,6 @@ export default async function locationsRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     await controller.deactivate(ctx, request.params.id);
-    reply.status(204).send();
+    return reply.status(204).send();
   });
 }

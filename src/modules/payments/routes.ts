@@ -30,7 +30,7 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.initiate(ctx, request.body);
-    sendCreated(reply, result);
+    return sendCreated(reply, result);
   });
 
   // ─── POST /payments/webhook/paystack ─────────────────────────────────────

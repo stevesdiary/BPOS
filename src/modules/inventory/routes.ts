@@ -32,7 +32,7 @@ export default async function inventoryRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const data = await controller.list(ctx, request.query);
-    sendSuccess(reply, data);
+    return sendSuccess(reply, data);
   });
 
   typed.post('/receive', {
@@ -46,7 +46,7 @@ export default async function inventoryRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const data = await controller.receive(ctx, request.body);
-    sendCreated(reply, data);
+    return sendCreated(reply, data);
   });
 
   typed.post('/adjust', {
@@ -60,7 +60,7 @@ export default async function inventoryRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const data = await controller.adjust(ctx, request.body);
-    sendSuccess(reply, data);
+    return sendSuccess(reply, data);
   });
 
   typed.get('/movements', {
@@ -74,7 +74,7 @@ export default async function inventoryRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const data = await controller.movements(ctx, request.query);
-    sendSuccess(reply, data);
+    return sendSuccess(reply, data);
   });
 
   typed.get('/low-stock', {
@@ -88,6 +88,6 @@ export default async function inventoryRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const data = await controller.lowStock(ctx, request.query.locationId);
-    sendSuccess(reply, data);
+    return sendSuccess(reply, data);
   });
 }

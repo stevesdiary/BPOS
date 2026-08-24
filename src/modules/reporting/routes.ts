@@ -32,7 +32,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const report = await controller.getPL(ctx, request.query.from, request.query.to);
-    sendSuccess(reply, report);
+    return sendSuccess(reply, report);
   });
 
   // ─── Best-selling products ───────────────────────────────────────────────────
@@ -47,7 +47,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const rows = await controller.getBestSellers(ctx, request.query);
-    sendSuccess(reply, rows);
+    return sendSuccess(reply, rows);
   });
 
   // ─── Revenue by location ─────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const rows = await controller.getRevenueByLocation(ctx, request.query);
-    sendSuccess(reply, rows);
+    return sendSuccess(reply, rows);
   });
 
   // ─── Staff sales report ──────────────────────────────────────────────────────
@@ -77,7 +77,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const rows = await controller.getStaffSales(ctx, request.query);
-    sendSuccess(reply, rows);
+    return sendSuccess(reply, rows);
   });
 
   // ─── P&L export (CSV) ────────────────────────────────────────────────────────
@@ -92,7 +92,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const csv = await controller.exportPL(ctx, request.query.from, request.query.to);
-    sendCsv(reply, csv, `pl-${request.query.from.slice(0, 10)}-${request.query.to.slice(0, 10)}.csv`);
+    return sendCsv(reply, csv, `pl-${request.query.from.slice(0, 10)}-${request.query.to.slice(0, 10)}.csv`);
   });
 
   // ─── Staff sales export (CSV) ─────────────────────────────────────────────────
@@ -107,7 +107,7 @@ export default async function reportingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const csv = await controller.exportStaffSales(ctx, request.query);
-    sendCsv(reply, csv, 'staff-sales.csv');
+    return sendCsv(reply, csv, 'staff-sales.csv');
   });
 
   // ─── Inventory valuation ──────────────────────────────────────────────────────
@@ -125,12 +125,11 @@ export default async function reportingRoutes(app: FastifyInstance) {
 
     if (request.query.format === 'csv') {
       const csv = await controller.exportInventoryValuation(ctx);
-      sendCsv(reply, csv, 'inventory-valuation.csv');
-      return;
+      return sendCsv(reply, csv, 'inventory-valuation.csv');
     }
 
     const rows = await controller.getInventoryValuation(ctx);
     const totalValueKobo = rows.reduce((s, r) => s + r.totalValueKobo, 0);
-    sendSuccess(reply, { rows, totalValueKobo });
+    return sendSuccess(reply, { rows, totalValueKobo });
   });
 }

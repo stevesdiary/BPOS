@@ -32,7 +32,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.create(ctx, request.body);
-    sendCreated(reply, order);
+    return sendCreated(reply, order);
   });
 
   // ─── List orders ───────────────────────────────────────────────────────────
@@ -48,7 +48,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.list(ctx, request.query);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Get single order ─────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, order);
+    return sendSuccess(reply, order);
   });
 
   // ─── State transitions ────────────────────────────────────────────────────
@@ -80,7 +80,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.confirm(ctx, request.params.id);
-    sendSuccess(reply, order);
+    return sendSuccess(reply, order);
   });
 
   typed.post('/:id/process', {
@@ -94,7 +94,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.process(ctx, request.params.id);
-    sendSuccess(reply, order);
+    return sendSuccess(reply, order);
   });
 
   typed.post('/:id/fulfil', {
@@ -108,7 +108,7 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.fulfil(ctx, request.params.id);
-    sendSuccess(reply, order);
+    return sendSuccess(reply, order);
   });
 
   typed.post('/:id/cancel', {
@@ -122,6 +122,6 @@ export default async function ordersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const order = await controller.cancel(ctx, request.params.id);
-    sendSuccess(reply, order);
+    return sendSuccess(reply, order);
   });
 }

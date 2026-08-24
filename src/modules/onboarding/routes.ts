@@ -23,6 +23,6 @@ export default function onboardingRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const status = await controller.getStatus(ctx);
-    sendSuccess(reply, status);
+    return sendSuccess(reply, status);
   });
 }

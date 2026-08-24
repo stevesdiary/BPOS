@@ -19,7 +19,7 @@ export default function tenantRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.create(ctx, request.body);
-    sendCreated(reply, {
+    return sendCreated(reply, {
       tenantId: result.tenantId,
       slug: result.slug,
       message: 'Tenant provisioned successfully. Use your business email to log in.',

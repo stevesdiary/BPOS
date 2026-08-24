@@ -29,7 +29,7 @@ export default async function customersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const customer = await controller.create(ctx, request.body);
-    sendCreated(reply, customer);
+    return sendCreated(reply, customer);
   });
 
   typed.get('/', {
@@ -43,7 +43,7 @@ export default async function customersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.list(ctx, request.query);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.get('/:id', {
@@ -57,7 +57,7 @@ export default async function customersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const customer = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, customer);
+    return sendSuccess(reply, customer);
   });
 
   typed.patch('/:id', {
@@ -72,6 +72,6 @@ export default async function customersRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const customer = await controller.update(ctx, request.params.id, request.body);
-    sendSuccess(reply, customer);
+    return sendSuccess(reply, customer);
   });
 }

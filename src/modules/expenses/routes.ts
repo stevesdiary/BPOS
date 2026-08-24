@@ -28,7 +28,7 @@ export default function expensesRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const expense = await controller.create(ctx, request.body);
-    sendCreated(reply, expense);
+    return sendCreated(reply, expense);
   });
 
   typed.get('/', {
@@ -42,7 +42,7 @@ export default function expensesRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.list(ctx, request.query);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   typed.get('/:id', {
@@ -56,6 +56,6 @@ export default function expensesRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const expense = await controller.get(ctx, request.params.id);
-    sendSuccess(reply, expense);
+    return sendSuccess(reply, expense);
   });
 }

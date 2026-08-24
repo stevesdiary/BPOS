@@ -46,6 +46,6 @@ export default async function uploadsRoutes(app: FastifyInstance) {
       mimeType: file.mimetype,
     });
 
-    sendCreated(reply, result);
+    return sendCreated(reply, result);
   });
 }

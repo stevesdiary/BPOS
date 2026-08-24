@@ -150,7 +150,7 @@ export default async function whatsappRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.setup(ctx, request.body);
-    sendMessage(reply, result.message);
+    return sendMessage(reply, result.message);
   });
 }
 

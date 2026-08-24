@@ -36,7 +36,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.configure(ctx, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Get dispatch config (key masked) ──────────────────────────────────────
@@ -50,7 +50,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const config = await controller.getConfig(ctx);
-    sendSuccess(reply, config);
+    return sendSuccess(reply, config);
   });
 
   // ─── Get shipping quote ────────────────────────────────────────────────────
@@ -65,7 +65,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.quote(ctx, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Dispatch an order ─────────────────────────────────────────────────────
@@ -84,7 +84,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.dispatch(ctx, request.params.orderId, request.body);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Track shipment ────────────────────────────────────────────────────────
@@ -99,7 +99,7 @@ export default async function dispatchRoutes(app: FastifyInstance) {
   }, async (request, reply) => {
     const ctx = createContext(request);
     const result = await controller.track(ctx, request.params.orderId);
-    sendSuccess(reply, result);
+    return sendSuccess(reply, result);
   });
 
   // ─── Inbound webhook from logistics provider ───────────────────────────────

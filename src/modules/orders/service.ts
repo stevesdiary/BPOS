@@ -1,6 +1,6 @@
 import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
-import { withTenantSchema } from '../../shared/db/tenant.js';
+import { withTenantSchema, type TenantDb } from '../../shared/db/tenant.js';
 import {
   orders,
   orderItems,
@@ -18,6 +18,33 @@ import { notificationsQueue } from '../../shared/queue/client.js';
 export { calculateOrderTotals } from './calculations.js';
 export type { LineInput, OrderTotals } from './calculations.js';
 import { calculateOrderTotals } from './calculations.js';
+
+// ─── Order Number Generation ─────────────────────────────────────────────────
+
+/**
+ * Generates the next order number atomically using a PostgreSQL sequence.
+ * Self-healing: creates and seeds the sequence on first use for tenant schemas
+ * that were provisioned before the sequence was added.
+ *
+ * The DO block uses entirely static SQL (no user input interpolated), so sql.raw() is safe.
+ */
+async function getNextOrderNumber(db: TenantDb): Promise<string> {
+  await db.execute(sql.raw(`
+    DO $$ BEGIN
+      CREATE SEQUENCE order_number_seq;
+      PERFORM setval('order_number_seq',
+        COALESCE((SELECT MAX(CAST(SPLIT_PART(order_number, '-', 2) AS INTEGER)) FROM orders), 0)
+      );
+    EXCEPTION WHEN duplicate_table THEN
+      NULL;
+    END $$
+  `));
+
+  const result = await db.execute(sql`SELECT nextval('order_number_seq') AS num`);
+  const rows = result.rows as Array<Record<string, unknown>>;
+  const nextNum = Number(rows[0]?.['num'] ?? 1);
+  return `ORD-${String(nextNum).padStart(6, '0')}`;
+}
 
 // ─── Create ──────────────────────────────────────────────────────────────────
 
@@ -57,10 +84,8 @@ export async function createOrder(
   }
 
   return withTenantSchema(schemaName, async (db) => {
-    // Sequential order number: count existing orders + 1
-    const [row] = await db.select({ count: sql<string>`count(*)` }).from(orders);
-    const nextNum = parseInt(row?.count ?? '0') + 1;
-    const orderNumber = `ORD-${String(nextNum).padStart(6, '0')}`;
+    // Atomic order number via PostgreSQL sequence — no race under concurrency
+    const orderNumber = await getNextOrderNumber(db);
 
     // Auto-compute taxKobo from variant's taxRateBps when not explicitly provided.
     // taxRateBps is stored as basis points (10000 = 100%), so 7.5% VAT = 750.
@@ -212,8 +237,14 @@ export async function confirmOrder(
   orderId: string,
   userId: string,
 ) {
-  // Step 1: validate and gather data
-  const { order, items, locationId } = await withTenantSchema(schemaName, async (db) => {
+  // All validation, stock deduction, and status update happen in a single session
+  // to prevent the race where stock is validated in one session and deducted in another.
+  // NOTE: The Neon HTTP driver is stateless per-query, so this is not a true DB
+  // transaction. For full ACID guarantees, migrate to the Neon WebSocket driver
+  // with drizzle's db.transaction(). The single-session approach still eliminates
+  // the inter-session race that existed with separate withTenantSchema calls.
+  const { updatedOrder, variantIds, locationId } = await withTenantSchema(schemaName, async (db) => {
+    // 1. Load and validate order
     const [order] = await db
       .select()
       .from(orders)
@@ -226,9 +257,10 @@ export async function confirmOrder(
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
     if (items.length === 0) throw new ValidationError('Order has no items');
 
-    if (!order.locationId) throw new ValidationError('Order must have a location to confirm');
+    const loc = order.locationId;
+    if (!loc) throw new ValidationError('Order must have a location to confirm');
 
-    // Validate stock availability for all items before deducting any
+    // 2. Validate stock and deduct immediately per item
     for (const item of items) {
       const [inv] = await db
         .select({ quantityOnHand: inventory.quantityOnHand })
@@ -236,7 +268,7 @@ export async function confirmOrder(
         .where(
           and(
             eq(inventory.variantId, item.variantId),
-            eq(inventory.locationId, order.locationId),
+            eq(inventory.locationId, loc),
           ),
         )
         .limit(1);
@@ -251,14 +283,7 @@ export async function confirmOrder(
           `Insufficient stock for '${variant?.name ?? item.variantId}' (SKU: ${variant?.sku ?? '?'})`,
         );
       }
-    }
 
-    return { order, items, locationId: order.locationId };
-  });
-
-  // Step 2: deduct stock and update order status
-  await withTenantSchema(schemaName, async (db) => {
-    for (const item of items) {
       await db
         .update(inventory)
         .set({
@@ -268,14 +293,14 @@ export async function confirmOrder(
         .where(
           and(
             eq(inventory.variantId, item.variantId),
-            eq(inventory.locationId, locationId),
+            eq(inventory.locationId, loc),
           ),
         );
 
       await db.insert(stockMovements).values({
         id: uuidv4(),
         variantId: item.variantId,
-        locationId,
+        locationId: loc,
         type: 'sale',
         quantity: item.quantity,
         referenceId: orderId,
@@ -284,14 +309,24 @@ export async function confirmOrder(
       });
     }
 
+    // 3. Update order status
     await db
       .update(orders)
       .set({ status: 'confirmed', updatedAt: new Date() })
       .where(eq(orders.id, orderId));
+
+    // 4. Re-read and return the updated order
+    const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
+    if (!updated) throw new NotFoundError('Order', orderId);
+
+    return {
+      updatedOrder: updated,
+      variantIds: items.map((i) => i.variantId),
+      locationId: loc,
+    };
   });
 
-  // Step 3: enqueue low-stock alerts asynchronously (non-blocking on failure)
-  const variantIds = items.map((i) => i.variantId);
+  // Enqueue low-stock alerts asynchronously (non-blocking on failure)
   await checkAndEnqueueLowStockAlerts(
     schemaName,
     tenantId,
@@ -302,10 +337,7 @@ export async function confirmOrder(
     // Alert failure must not roll back the confirmation
   });
 
-  return withTenantSchema(schemaName, async (db) => {
-    const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
-    return updated!;
-  });
+  return updatedOrder;
 }
 
 export async function processOrder(schemaName: string, orderId: string) {
@@ -325,7 +357,8 @@ export async function processOrder(schemaName: string, orderId: string) {
       .where(eq(orders.id, orderId));
 
     const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
-    return updated!;
+    if (!updated) throw new NotFoundError('Order', orderId);
+    return updated;
   });
 }
 
@@ -346,7 +379,8 @@ export async function fulfillOrder(schemaName: string, orderId: string) {
       .where(eq(orders.id, orderId));
 
     const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
-    return updated!;
+    if (!updated) throw new NotFoundError('Order', orderId);
+    return updated;
   });
 }
 
@@ -355,8 +389,10 @@ export async function cancelOrder(
   orderId: string,
   userId: string,
 ) {
-  // Step 1: validate and check if stock restoration is needed
-  const { order, priorStatus, locationId } = await withTenantSchema(schemaName, async (db) => {
+  // All validation, stock restoration, and status update happen in a single session.
+  // See confirmOrder for notes on Neon HTTP driver and transactional guarantees.
+  return withTenantSchema(schemaName, async (db) => {
+    // 1. Load and validate
     const [order] = await db
       .select()
       .from(orders)
@@ -366,17 +402,10 @@ export async function cancelOrder(
 
     assertTransition(order.status as OrderStatus, 'cancelled');
 
-    return {
-      order,
-      priorStatus: order.status as OrderStatus,
-      locationId: order.locationId,
-    };
-  });
+    const priorStatus = order.status as OrderStatus;
 
-  // Step 2: restore stock if order was already confirmed or processing
-  if (locationId && (priorStatus === 'confirmed' || priorStatus === 'processing')) {
-    await withTenantSchema(schemaName, async (db) => {
-      // Find all sale movements for this order
+    // 2. Restore stock if order was already confirmed or processing
+    if (order.locationId && (priorStatus === 'confirmed' || priorStatus === 'processing')) {
       const saleMovements = await db
         .select()
         .from(stockMovements)
@@ -413,17 +442,17 @@ export async function cancelOrder(
           createdBy: userId,
         });
       }
-    });
-  }
+    }
 
-  // Step 3: mark order as cancelled
-  return withTenantSchema(schemaName, async (db) => {
+    // 3. Mark order as cancelled
     await db
       .update(orders)
       .set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() })
       .where(eq(orders.id, orderId));
 
     const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
-    return updated!;
+    if (!updated) throw new NotFoundError('Order', orderId);
+
+    return updated;
   });
 }

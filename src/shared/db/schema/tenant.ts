@@ -142,7 +142,7 @@ export const productVariants = pgTable(
     // Tax rate in basis points (10000 = 100%). Nigeria standard VAT = 750 (7.5%).
     // null = no tax / inherit from business default. Only visible to manager+.
     taxRateBps: integer('tax_rate_bps'),
-    attributes: text('attributes'), // JSON string: { color: 'red', size: 'M' }
+    attributes: jsonb('attributes'), // JSON: { color: 'red', size: 'M' }
     weightKg: real('weight_kg'), // optional — required for weight-based shipping rates
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

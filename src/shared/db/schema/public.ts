@@ -56,6 +56,7 @@ export const refreshTokens = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull(),
     tokenHash: text('token_hash').notNull(),
+    tokenPrefix: text('token_prefix').notNull(), // First 16 chars of raw token for O(1) lookup
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -63,6 +64,7 @@ export const refreshTokens = pgTable(
   (table) => ({
     tenantUserIdx: index('refresh_tokens_tenant_user_idx').on(table.tenantId, table.userId),
     expiryIdx: index('refresh_tokens_expiry_idx').on(table.expiresAt),
+    prefixIdx: index('refresh_tokens_prefix_idx').on(table.tokenPrefix),
   }),
 );
 

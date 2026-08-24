@@ -4,9 +4,6 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { db } from '../../shared/db/client.js';
-import { tenants } from '../../shared/db/schema/public.js';
-import { eq } from 'drizzle-orm';
 import { NotFoundError } from '../../shared/errors/types.js';
 import {
   loginUser,
@@ -15,16 +12,7 @@ import {
   requestPasswordReset,
   resetPassword,
 } from './service.js';
-
-async function resolveTenantFromSlug(tenantSlug: string) {
-  const [tenant] = await db
-    .select({ id: tenants.id, schemaName: tenants.schemaName })
-    .from(tenants)
-    .where(eq(tenants.slug, tenantSlug))
-    .limit(1);
-  if (!tenant) throw new NotFoundError('Tenant');
-  return tenant;
-}
+import { resolveTenantFromSlug } from '../../shared/utils/tenant.js';
 
 export interface LoginInput {
   tenantSlug: string;
@@ -67,26 +55,9 @@ export interface ForgotPasswordInput {
   email: string;
 }
 
-export async function forgotPassword(input: ForgotPasswordInput, logger: { info: (obj: unknown, msg: string) => void }) {
-  const [tenant] = await db
-    .select({ id: tenants.id, schemaName: tenants.schemaName })
-    .from(tenants)
-    .where(eq(tenants.slug, input.tenantSlug))
-    .limit(1);
-
-  if (!tenant) {
-    return { message: 'If the email exists, a reset link has been sent' };
-  }
-
-  const result = await requestPasswordReset(tenant.id, tenant.schemaName, input.email);
-
-  if (result) {
-    logger.info(
-      { token: result.rawToken, email: result.userEmail },
-      'Password reset token generated (dev only — would be sent via email in production)',
-    );
-  }
-
+export async function forgotPassword(input: ForgotPasswordInput) {
+  const tenant = await resolveTenantFromSlug(input.tenantSlug);
+  await requestPasswordReset(tenant.id, tenant.schemaName, input.email);
   return { message: 'If the email exists, a reset link has been sent' };
 }
 

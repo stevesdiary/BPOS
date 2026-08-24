@@ -3,6 +3,7 @@ import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
 import { sql } from 'drizzle-orm';
 import { env } from '../../config/env.js';
 import * as tenantSchema from './schema/tenant.js';
+import { ValidationError } from '../errors/types.js';
 
 export type TenantDb = NeonHttpDatabase<typeof tenantSchema>;
 
@@ -23,6 +24,9 @@ export async function withTenantSchema<T>(
   schemaName: string,
   callback: (db: TenantDb) => Promise<T>,
 ): Promise<T> {
+  if (!validateSchemaName(schemaName)) {
+    throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
+  }
   const tenantDb = createTenantDb();
   await tenantDb.execute(sql.raw(`SET search_path TO "${schemaName}", public`));
   return callback(tenantDb);
@@ -33,8 +37,13 @@ export async function withTenantSchema<T>(
  * Called during tenant provisioning before running migrations.
  */
 export async function provisionTenantSchema(schemaName: string): Promise<void> {
+  if (!validateSchemaName(schemaName)) {
+    throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
+  }
   const tenantDb = createTenantDb();
   await tenantDb.execute(sql.raw(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`));
+  // Create the order_number_seq in the new schema for atomic order number generation.
+  await tenantDb.execute(sql.raw(`CREATE SEQUENCE IF NOT EXISTS "${schemaName}".order_number_seq`));
 }
 
 /**

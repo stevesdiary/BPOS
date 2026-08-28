@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -70,8 +71,10 @@ const envSchema = z.object({
   AXIOM_TOKEN: z.string().optional(),
   AXIOM_DATASET: z.string().default('bpos-production'),
 
-  // Email (optional — invoice delivery via Resend; emails skipped when not set)
+  // Email (optional — invoice delivery via Resend or Brevo; emails skipped when not set)
+  EMAIL_PROVIDER: z.enum(['resend', 'brevo']).default('resend'),
   RESEND_API_KEY: z.string().optional(),
+  BREVO_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
 });
 

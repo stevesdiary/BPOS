@@ -259,6 +259,7 @@ export async function requestPasswordReset(
   // Generate a cryptographically secure random token
   const rawToken = randomBytes(RESET_TOKEN_BYTES).toString('hex'); // 64 hex chars
   const tokenHash = await argon2.hash(rawToken);
+  const tokenPrefix = rawToken.slice(0, TOKEN_PREFIX_LENGTH);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS);
 
   await db.insert(passwordResetTokens).values({
@@ -266,6 +267,7 @@ export async function requestPasswordReset(
     tenantId,
     userId: user.id,
     tokenHash,
+    tokenPrefix,
     expiresAt,
   });
 
@@ -283,29 +285,28 @@ export async function resetPassword(
   newPassword: string,
 ): Promise<void> {
   const now = new Date();
+  const tokenPrefix = rawToken.slice(0, TOKEN_PREFIX_LENGTH);
 
-  // Find all non-used, non-expired tokens for this tenant
-  const pendingTokens = await db
+  // Find the exact token using tokenPrefix
+  const [matched] = await db
     .select()
     .from(passwordResetTokens)
     .where(
       and(
         eq(passwordResetTokens.tenantId, tenantId),
+        eq(passwordResetTokens.tokenPrefix, tokenPrefix),
         gt(passwordResetTokens.expiresAt, now),
         isNull(passwordResetTokens.usedAt),
       ),
-    );
-
-  let matched: (typeof pendingTokens)[number] | undefined;
-  for (const token of pendingTokens) {
-    const valid = await argon2.verify(token.tokenHash, rawToken);
-    if (valid) {
-      matched = token;
-      break;
-    }
-  }
+    )
+    .limit(1);
 
   if (!matched) {
+    throw new UnauthorizedError('Invalid or expired reset token');
+  }
+
+  const valid = await argon2.verify(matched.tokenHash, rawToken);
+  if (!valid) {
     throw new UnauthorizedError('Invalid or expired reset token');
   }
 

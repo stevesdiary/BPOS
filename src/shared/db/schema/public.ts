@@ -102,6 +102,7 @@ export const passwordResetTokens = pgTable(
       .references(() => tenants.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull(),
     tokenHash: text('token_hash').notNull(), // argon2 hash of the raw token
+    tokenPrefix: text('token_prefix').notNull(), // First 16 chars of raw token for O(1) lookup
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     usedAt: timestamp('used_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -109,6 +110,7 @@ export const passwordResetTokens = pgTable(
   (table) => ({
     tenantUserIdx: index('password_reset_tokens_tenant_user_idx').on(table.tenantId, table.userId),
     expiryIdx: index('password_reset_tokens_expiry_idx').on(table.expiresAt),
+    prefixIdx: index('password_reset_tokens_prefix_idx').on(table.tokenPrefix),
   }),
 );
 

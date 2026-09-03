@@ -14,6 +14,18 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 
+  // Platform (internal staff) JWT — a DISTINCT secret from the tenant plane, so
+  // that a tenant-token compromise can never mint a platform token. Short-lived
+  // by design: this console can reach across every tenant.
+  //
+  // Optional so dev/test boot without it; when unset the entire /v1/platform
+  // plane is left unregistered. There is deliberately no default value — a
+  // fallback secret would be equivalent to no authentication at all.
+  // Required in production (enforced below).
+  JWT_PLATFORM_SECRET: z.string().min(32).optional(),
+  JWT_PLATFORM_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_PLATFORM_REFRESH_EXPIRY: z.string().default('8h'),
+
   // Redis
   REDIS_URL: z.string().default('redis://localhost:6379'),
 
@@ -75,8 +87,26 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().email().optional(),
 });
 
+/**
+ * Secrets that are optional in dev/test but must be present in production.
+ * Enforced here rather than at the field level so local development and the
+ * test suite can boot without them, while a production deploy fails fast.
+ */
+const productionRequiredSchema = envSchema.superRefine((cfg, ctx) => {
+  if (cfg.NODE_ENV !== 'production') return;
+  if (!cfg.JWT_PLATFORM_SECRET) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['JWT_PLATFORM_SECRET'],
+      message:
+        'JWT_PLATFORM_SECRET is required in production — the /v1/platform admin plane ' +
+        'cannot run without its own signing secret.',
+    });
+  }
+});
+
 function parseEnv() {
-  const result = envSchema.safeParse(process.env);
+  const result = productionRequiredSchema.safeParse(process.env);
   if (!result.success) {
     const formatted = result.error.format();
     console.error('Invalid environment configuration:', JSON.stringify(formatted, null, 2));

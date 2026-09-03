@@ -15,6 +15,7 @@ export default defineConfig({
       JWT_ACCESS_SECRET: 'test-access-secret-minimum-32-chars-padding!!',
       JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars-padding!',
       JWT_ACCESS_EXPIRY: '15m',
+      JWT_PLATFORM_SECRET: 'test-platform-secret-minimum-32-chars-pad!!',
       R2_ACCOUNT_ID: 'test-account-id',
       R2_ACCESS_KEY_ID: 'test-access-key',
       R2_SECRET_ACCESS_KEY: 'test-secret-access-key',

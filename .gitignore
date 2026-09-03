@@ -7,3 +7,4 @@ tsconfig.tsbuildinfo
 coverage
 *.local
 .DS_Store
+dump.rdb

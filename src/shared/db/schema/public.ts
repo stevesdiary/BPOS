@@ -207,6 +207,45 @@ export const platformAuditLog = pgTable(
   }),
 );
 
+export const grantScopeEnum = pgEnum('grant_scope', ['read', 'write']);
+
+/**
+ * Time-boxed, reason-required authorisation for a platform user to reach into
+ * ONE tenant's data.
+ *
+ * Cross-tenant reach is deliberately not implied by holding a platform
+ * identity: a support agent must open a grant, state why, and it expires. The
+ * merchant sees every grant in their own audit_log and is notified when one
+ * opens.
+ */
+export const tenantAccessGrants = pgTable(
+  'tenant_access_grants',
+  {
+    id: text('id').primaryKey(),
+    platformUserId: text('platform_user_id')
+      .notNull()
+      .references(() => platformUsers.id, { onDelete: 'cascade' }),
+    tenantId: text('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    scope: grantScopeEnum('scope').notNull().default('read'),
+    // Not nullable: an unexplained grant is not defensible after the fact.
+    reason: text('reason').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    // The lookup requireTenantGrant does on every support request.
+    activeIdx: index('tenant_access_grants_active_idx').on(
+      table.platformUserId,
+      table.tenantId,
+      table.expiresAt,
+    ),
+    tenantIdx: index('tenant_access_grants_tenant_idx').on(table.tenantId),
+  }),
+);
+
 export type Tenant = typeof tenants.$inferSelect;
 export type NewTenant = typeof tenants.$inferInsert;
 export type RefreshToken = typeof refreshTokens.$inferSelect;
@@ -221,3 +260,5 @@ export type PlatformSession = typeof platformSessions.$inferSelect;
 export type NewPlatformSession = typeof platformSessions.$inferInsert;
 export type PlatformAuditEntry = typeof platformAuditLog.$inferSelect;
 export type NewPlatformAuditEntry = typeof platformAuditLog.$inferInsert;
+export type TenantAccessGrant = typeof tenantAccessGrants.$inferSelect;
+export type NewTenantAccessGrant = typeof tenantAccessGrants.$inferInsert;

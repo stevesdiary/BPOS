@@ -37,6 +37,7 @@ import onboardingRoutes from './modules/onboarding/routes.js';
 import dispatchRoutes from './modules/dispatch/routes.js';
 import uploadsRoutes from './modules/uploads/routes.js';
 import shippingRoutes from './modules/shipping/routes.js';
+import platformRoutes from './modules/platform/routes.js';
 
 export function buildApp() {
   const axiomTransport = createAxiomLogger();
@@ -84,6 +85,20 @@ export function buildApp() {
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
   });
 
+  // Second JWT instance for the internal admin plane, under its own namespace
+  // and its own secret. Keeping the key sets disjoint is what stops a
+  // tenant-token compromise from minting a platform token — a platform token
+  // cannot be verified by the tenant instance, and vice versa.
+  if (env.JWT_PLATFORM_SECRET) {
+    void app.register(jwtPlugin, {
+      secret: env.JWT_PLATFORM_SECRET,
+      namespace: 'platform',
+      jwtVerify: 'platformJwtVerify',
+      jwtSign: 'platformJwtSign',
+      sign: { expiresIn: env.JWT_PLATFORM_ACCESS_EXPIRY },
+    });
+  }
+
   registerRequestId(app);
 
   // Health check (unauthenticated, not in swagger)
@@ -114,6 +129,11 @@ export function buildApp() {
   void app.register(dispatchRoutes,    { prefix: '/v1/dispatch' });
   void app.register(uploadsRoutes,     { prefix: '/v1/uploads' });
   void app.register(shippingRoutes,   { prefix: '/v1/shipping' });
+
+  // Internal admin plane — only mounted when its signing secret is configured.
+  if (env.JWT_PLATFORM_SECRET) {
+    void app.register(platformRoutes, { prefix: '/v1/platform' });
+  }
 
   return app;
 }

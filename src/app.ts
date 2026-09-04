@@ -38,6 +38,7 @@ import dispatchRoutes from './modules/dispatch/routes.js';
 import uploadsRoutes from './modules/uploads/routes.js';
 import shippingRoutes from './modules/shipping/routes.js';
 import platformRoutes from './modules/platform/routes.js';
+import settingsRoutes from './modules/settings/routes.js';
 
 export function buildApp() {
   const axiomTransport = createAxiomLogger();
@@ -83,6 +84,16 @@ export function buildApp() {
   void app.register(jwtPlugin, {
     secret: env.JWT_ACCESS_SECRET,
     sign: { expiresIn: env.JWT_ACCESS_EXPIRY },
+    // The token carries short claim names (sub/tid) to keep it small, but
+    // resolveTenant, /auth/me, logout and the Sentry context all read
+    // request.user.userId / .tenantId. Without this mapping those are
+    // undefined and every authenticated tenant request fails with
+    // "Tenant context missing from token".
+    formatUser: (payload) => ({
+      ...payload,
+      userId: payload.sub,
+      tenantId: payload.tid,
+    }),
   });
 
   // Second JWT instance for the internal admin plane, under its own namespace
@@ -119,16 +130,17 @@ export function buildApp() {
   void app.register(paymentsRoutes, { prefix: '/v1/payments' });
   void app.register(ledgerRoutes, { prefix: '/v1/ledger' });
   void app.register(subscriptionsRoutes, { prefix: '/v1/subscriptions' });
-  void app.register(locationsRoutes,    { prefix: '/v1/locations' });
-  void app.register(staffRoutes,        { prefix: '/v1/staff' });
-  void app.register(expensesRoutes,     { prefix: '/v1/expenses' });
-  void app.register(reportingRoutes,    { prefix: '/v1/reports' });
-  void app.register(invoicingRoutes,    { prefix: '/v1/invoices' });
-  void app.register(whatsappRoutes,    { prefix: '/v1/whatsapp' });
-  void app.register(onboardingRoutes,  { prefix: '/v1/onboarding' });
-  void app.register(dispatchRoutes,    { prefix: '/v1/dispatch' });
-  void app.register(uploadsRoutes,     { prefix: '/v1/uploads' });
-  void app.register(shippingRoutes,   { prefix: '/v1/shipping' });
+  void app.register(locationsRoutes, { prefix: '/v1/locations' });
+  void app.register(staffRoutes, { prefix: '/v1/staff' });
+  void app.register(expensesRoutes, { prefix: '/v1/expenses' });
+  void app.register(reportingRoutes, { prefix: '/v1/reports' });
+  void app.register(invoicingRoutes, { prefix: '/v1/invoices' });
+  void app.register(whatsappRoutes, { prefix: '/v1/whatsapp' });
+  void app.register(onboardingRoutes, { prefix: '/v1/onboarding' });
+  void app.register(dispatchRoutes, { prefix: '/v1/dispatch' });
+  void app.register(uploadsRoutes, { prefix: '/v1/uploads' });
+  void app.register(shippingRoutes, { prefix: '/v1/shipping' });
+  void app.register(settingsRoutes, { prefix: '/v1/settings' });
 
   // Internal admin plane — only mounted when its signing secret is configured.
   if (env.JWT_PLATFORM_SECRET) {

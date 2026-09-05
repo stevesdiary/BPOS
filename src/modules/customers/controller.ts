@@ -1,4 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import { createCustomer, listCustomers, getCustomer, updateCustomer } from './service.js';
 
 export async function create(
@@ -14,7 +15,13 @@ export async function create(
     consentSource?: string;
   },
 ) {
-  return createCustomer(ctx.schema, input);
+  const customer = await createCustomer(ctx.schema, input);
+  await auditUserAction(ctx, {
+    action: 'customer.created',
+    targetType: 'customer',
+    targetId: customer.id,
+  });
+  return customer;
 }
 
 export async function list(
@@ -47,10 +54,17 @@ export async function update(
   }>,
 ) {
   const { consentGivenAt, ...rest } = input;
-  return updateCustomer(ctx.schema, id, {
+  const customer = await updateCustomer(ctx.schema, id, {
     ...rest,
     ...(consentGivenAt !== undefined && {
       consentGivenAt: consentGivenAt ? new Date(consentGivenAt) : null,
     }),
   });
+  await auditUserAction(ctx, {
+    action: 'customer.updated',
+    targetType: 'customer',
+    targetId: id,
+    metadata: { fields: Object.keys(input) },
+  });
+  return customer;
 }

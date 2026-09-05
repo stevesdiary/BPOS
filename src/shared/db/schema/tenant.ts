@@ -13,7 +13,6 @@ import {
   pgEnum,
   uniqueIndex,
   index,
-  numeric,
   jsonb,
   real,
 } from 'drizzle-orm/pg-core';

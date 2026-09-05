@@ -4,7 +4,6 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { NotFoundError } from '../../shared/errors/types.js';
 import {
   loginUser,
   refreshAccessToken,

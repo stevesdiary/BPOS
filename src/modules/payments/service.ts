@@ -67,11 +67,14 @@ export async function initiatePayment(
 
 // ─── Handle Paystack webhook event ───────────────────────────────────────────
 
+// `string & {}` keeps the known event literals as editor hints without letting
+// TypeScript collapse the whole union down to `string`, while still accepting
+// any other event Paystack may send.
 export type PaystackEventType =
   | 'charge.success'
   | 'charge.failed'
   | 'refund.processed'
-  | string;
+  | (string & {});
 
 export interface PaystackWebhookData {
   id: string | number;     // Paystack event ID
@@ -134,11 +137,11 @@ export async function handlePaystackWebhook(
 
       // Post journal entries (non-blocking on failure — payment is already recorded)
       await postJournalEntry(schemaName, orderPaidTemplate(payment.id, payment.orderId, amountKobo))
-        .catch(() => {}); // Journal failure must never roll back the payment
+        .catch(() => {/* non-fatal: secondary failure intentionally ignored */}); // Journal failure must never roll back the payment
 
       if (feeKobo > 0) {
         await postJournalEntry(schemaName, paymentFeeTemplate(payment.id, feeKobo))
-          .catch(() => {});
+          .catch(() => {/* non-fatal: secondary failure intentionally ignored */});
       }
     });
   }
@@ -172,7 +175,7 @@ export async function handlePaystackWebhook(
         .where(eq(orders.id, payment.orderId));
 
       await postJournalEntry(schemaName, orderRefundedTemplate(payment.id, amountKobo))
-        .catch(() => {});
+        .catch(() => {/* non-fatal: secondary failure intentionally ignored */});
     });
   }
 

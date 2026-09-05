@@ -111,7 +111,7 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
 
           const payload = request.body as { event: string; data: { txRef?: string; tx_ref?: string; metadata?: Record<string, unknown>; id?: number; status?: string; amount?: number; app_fee?: number; flw_ref?: string; created_at?: string } };
 
-          const meta = (payload.data?.metadata ?? {}) as Record<string, unknown>;
+          const meta = (payload.data?.metadata ?? {});
           const schemaName = (meta['schemaName'] as string | undefined) ?? '';
           if (!schemaName) return sendSuccess(reply, undefined);
 
@@ -123,7 +123,7 @@ export default async function paymentsRoutes(fastify: FastifyInstance) {
               amount: Math.round((payload.data.amount ?? 0) * 100),
               fees: Math.round((payload.data.app_fee ?? 0) * 100),
               status: 'success',
-              metadata: meta as { orderId?: string; schemaName?: string },
+              metadata: meta,
             }, meta);
           }
 

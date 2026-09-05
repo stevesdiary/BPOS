@@ -79,7 +79,7 @@ describe('Uploads API', () => {
       expect.objectContaining({ contentType: 'image/jpeg' }),
     );
     const call = vi.mocked(uploadToR2).mock.calls.at(-1)!;
-    const uploadedBody = call[0].body as Buffer;
+    const uploadedBody = call[0].body;
     expect(uploadedBody.length).toBeLessThan(source.length);
   });
 

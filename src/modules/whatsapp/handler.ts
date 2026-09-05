@@ -38,14 +38,12 @@ export async function handleInboundMessage(
   let session = await getSession(phoneNumberId, from);
 
   // New session or expired
-  if (!session) {
-    session = {
-      state: 'greeting',
-      tenantId,
-      schemaName,
-      cart: [],
-    };
-  }
+  session ??= {
+    state: 'greeting',
+    tenantId,
+    schemaName,
+    cart: [],
+  };
 
   // Global shortcut: "cart" at any point
   const bodyLower = messageBody.trim().toLowerCase();

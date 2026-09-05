@@ -17,7 +17,6 @@ import {
   FeatureGatedError,
 } from '../../src/shared/errors/types.js';
 import type { UserRole } from '../../src/shared/types/index.js';
-import type { FeatureKey } from '../../src/config/features.js';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function mockRequest(overrides: Record<string, unknown> = {}): FastifyRequest {

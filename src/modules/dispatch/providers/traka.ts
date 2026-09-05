@@ -44,7 +44,7 @@ interface TrakaTrackResponse {
   tracking_number: string;
   status: string;
   current_location?: string;
-  events: Array<{ status: string; timestamp: string; location?: string }>;
+  events: { status: string; timestamp: string; location?: string }[];
 }
 
 async function trakaRequest<T>(path: string, apiKey: string, init?: RequestInit): Promise<T> {

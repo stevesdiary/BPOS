@@ -322,11 +322,11 @@ export async function resetPassword(
     const [updated] = await tenantDb
       .update(users)
       .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(users.id, matched!.userId))
+      .where(eq(users.id, matched.userId))
       .returning({ id: users.id });
 
     if (!updated) {
-      throw new NotFoundError('User', matched!.userId);
+      throw new NotFoundError('User', matched.userId);
     }
   });
 

@@ -12,7 +12,7 @@ import {
 import type { Order } from '../../shared/db/schema/tenant.js';
 import { NotFoundError, ValidationError } from '../../shared/errors/types.js';
 import type { PaginatedResult } from '../../shared/types/index.js';
-import { assertTransition, type OrderStatus } from './state-machine.js';
+import { assertTransition } from './state-machine.js';
 import { checkAndEnqueueLowStockAlerts } from '../inventory/service.js';
 import { notificationsQueue } from '../../shared/queue/client.js';
 export { calculateOrderTotals } from './calculations.js';
@@ -41,7 +41,7 @@ async function getNextOrderNumber(db: TenantDb): Promise<string> {
   `));
 
   const result = await db.execute(sql`SELECT nextval('order_number_seq') AS num`);
-  const rows = result.rows as Array<Record<string, unknown>>;
+  const rows = result.rows;
   const nextNum = Number(rows[0]?.['num'] ?? 1);
   return `ORD-${String(nextNum).padStart(6, '0')}`;
 }
@@ -53,13 +53,13 @@ export interface CreateOrderInput {
   locationId?: string;
   assignedTo?: string;
   channel?: string;
-  items: Array<{
+  items: {
     variantId: string;
     quantity: number;
     unitPriceKobo: number;
     discountKobo?: number;
     taxKobo?: number;
-  }>;
+  }[];
   discountKobo?: number;
   taxKobo?: number;
   note?: string;
@@ -252,7 +252,7 @@ export async function confirmOrder(
       .limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
-    assertTransition(order.status as OrderStatus, 'confirmed');
+    assertTransition(order.status, 'confirmed');
 
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
     if (items.length === 0) throw new ValidationError('Order has no items');
@@ -349,7 +349,7 @@ export async function processOrder(schemaName: string, orderId: string) {
       .limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
-    assertTransition(order.status as OrderStatus, 'processing');
+    assertTransition(order.status, 'processing');
 
     await db
       .update(orders)
@@ -371,7 +371,7 @@ export async function fulfillOrder(schemaName: string, orderId: string) {
       .limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
-    assertTransition(order.status as OrderStatus, 'fulfilled');
+    assertTransition(order.status, 'fulfilled');
 
     await db
       .update(orders)
@@ -400,9 +400,9 @@ export async function cancelOrder(
       .limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
-    assertTransition(order.status as OrderStatus, 'cancelled');
+    assertTransition(order.status, 'cancelled');
 
-    const priorStatus = order.status as OrderStatus;
+    const priorStatus = order.status;
 
     // 2. Restore stock if order was already confirmed or processing
     if (order.locationId && (priorStatus === 'confirmed' || priorStatus === 'processing')) {

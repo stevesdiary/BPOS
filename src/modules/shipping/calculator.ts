@@ -5,7 +5,7 @@
  * shipping method whose conditions aren't met, or a zone rate with no matching zone).
  */
 
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { withTenantSchema } from '../../shared/db/tenant.js';
 import {
   shippingMethods,
@@ -85,8 +85,7 @@ export async function resolveMethodFee(
           if (
             c.conditionType === 'promo_code' &&
             c.promoCode &&
-            ctx.promoCode &&
-            c.promoCode.toLowerCase() === ctx.promoCode.toLowerCase()
+            c.promoCode.toLowerCase() === ctx.promoCode?.toLowerCase()
           ) return 0;
         }
         return null; // no condition met — method unavailable

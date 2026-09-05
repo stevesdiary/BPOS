@@ -40,7 +40,7 @@ export async function createExpense(
     schemaName,
     expenseRecordedTemplate(id, input.amountKobo, input.description),
     userId,
-  ).catch(() => {});
+  ).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
 
   return withTenantSchema(schemaName, async (db) => {
     const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));

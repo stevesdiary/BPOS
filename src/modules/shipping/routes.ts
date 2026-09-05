@@ -119,7 +119,7 @@ export default async function shippingRoutes(app: FastifyInstance) {
     },
   }, async (request, reply) => {
     const ctx = createContext(request);
-    const method = await controller.createMethod(ctx, request.body as never);
+    const method = await controller.createMethod(ctx, request.body);
     return sendCreated(reply, method);
   });
 

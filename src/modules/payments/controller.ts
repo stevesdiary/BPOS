@@ -44,7 +44,7 @@ export async function handleWebhook(
       planTier as 'entry' | 'growth' | 'enterprise',
       (authorization?.['authorization_code'] as string) ?? '',
       (customer?.['customer_code'] as string) ?? '',
-    ).catch(() => {});
+    ).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
   } else {
     await handlePaystackWebhook(schemaName, eventType, data);
   }

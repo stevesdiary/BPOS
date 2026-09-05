@@ -44,14 +44,14 @@ type MetaMessage = MetaTextMessage | MetaInteractiveMessage;
 
 interface MetaWebhookEntry {
   id: string;
-  changes: Array<{
+  changes: {
     value: {
       metadata: { phone_number_id: string; display_phone_number: string };
       messages?: MetaMessage[];
       statuses?: unknown[];
     };
     field: string;
-  }>;
+  }[];
 }
 
 interface MetaWebhookPayload {

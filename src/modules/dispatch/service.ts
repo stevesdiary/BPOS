@@ -41,7 +41,7 @@ export async function configureLogistics(
       integrationType: 'logistics',
       providerName,
       apiKeyEncrypted,
-      config: config as unknown as Record<string, unknown>,
+      config: config,
       isActive: true,
     })
     .onConflictDoUpdate({
@@ -49,7 +49,7 @@ export async function configureLogistics(
       set: {
         providerName,
         apiKeyEncrypted,
-        config: config as unknown as Record<string, unknown>,
+        config: config,
         isActive: true,
         updatedAt: new Date(),
       },

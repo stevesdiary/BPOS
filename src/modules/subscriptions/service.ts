@@ -191,6 +191,8 @@ export async function handleSubscriptionBillingWebhook(
     await activateSubscription(schemaName, tenantId, planTier, authorizationCode, customerCode);
   } else if (eventType === 'charge.failed') {
     // Billing failure: enter grace period; cron job will lapse after 7 days
-    await startGracePeriod(schemaName, tenantId).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
+    await startGracePeriod(schemaName, tenantId).catch(() => {
+      /* non-fatal: secondary failure intentionally ignored */
+    });
   }
 }

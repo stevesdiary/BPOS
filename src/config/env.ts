@@ -70,7 +70,11 @@ const envSchema = z.object({
   SWAGGER_ENABLED: z.coerce.boolean().default(true),
 
   // Uploads
-  MAX_UPLOAD_SIZE_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024), // 10MB raw cap pre-compression
+  MAX_UPLOAD_SIZE_BYTES: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(10 * 1024 * 1024), // 10MB raw cap pre-compression
 
   // Alerting (optional — Slack notifications for server errors)
   SLACK_WEBHOOK_URL: z.string().url().optional(),

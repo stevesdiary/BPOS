@@ -184,7 +184,9 @@ export const stockMovements = pgTable(
     variantId: text('variant_id')
       .notNull()
       .references(() => productVariants.id),
-    locationId: text('location_id').notNull().references(() => locations.id),
+    locationId: text('location_id')
+      .notNull()
+      .references(() => locations.id),
     type: stockMovementTypeEnum('type').notNull(),
     quantity: integer('quantity').notNull(),
     referenceId: text('reference_id'), // orderId, purchaseOrderId, etc.

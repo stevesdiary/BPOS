@@ -75,9 +75,7 @@ describe('Uploads API', () => {
     expect(body.success).toBe(true);
     expect(body.data.url).toBe('https://test.r2.example.com/test_schema/uploads/fake.jpg');
 
-    expect(uploadToR2).toHaveBeenCalledWith(
-      expect.objectContaining({ contentType: 'image/jpeg' }),
-    );
+    expect(uploadToR2).toHaveBeenCalledWith(expect.objectContaining({ contentType: 'image/jpeg' }));
     const call = vi.mocked(uploadToR2).mock.calls.at(-1)!;
     const uploadedBody = call[0].body;
     expect(uploadedBody.length).toBeLessThan(source.length);

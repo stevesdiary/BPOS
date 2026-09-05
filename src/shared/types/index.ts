@@ -37,8 +37,8 @@ export interface PlatformJwtPayload {
 }
 
 export interface JwtPayload {
-  sub: string;       // userId
-  tid: string;       // tenantId
+  sub: string; // userId
+  tid: string; // tenantId
   role: UserRole;
   email: string;
   type: 'access' | 'refresh';
@@ -81,4 +81,3 @@ export interface PaginatedResult<T> {
   limit: number;
   totalPages: number;
 }
-

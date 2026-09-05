@@ -40,7 +40,9 @@ export async function createExpense(
     schemaName,
     expenseRecordedTemplate(id, input.amountKobo, input.description),
     userId,
-  ).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
+  ).catch(() => {
+    /* non-fatal: secondary failure intentionally ignored */
+  });
 
   return withTenantSchema(schemaName, async (db) => {
     const [expense] = await db.select().from(expenses).where(eq(expenses.id, id));
@@ -92,11 +94,7 @@ export async function listExpenses(
 
 export async function getExpense(schemaName: string, expenseId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [expense] = await db
-      .select()
-      .from(expenses)
-      .where(eq(expenses.id, expenseId))
-      .limit(1);
+    const [expense] = await db.select().from(expenses).where(eq(expenses.id, expenseId)).limit(1);
     if (!expense) throw new NotFoundError('Expense', expenseId);
     return expense;
   });

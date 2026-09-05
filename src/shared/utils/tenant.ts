@@ -8,11 +8,11 @@ import { NotFoundError } from '../errors/types.js';
  * Used by auth endpoints that don't have JWT context yet.
  */
 export async function resolveTenantFromSlug(tenantSlug: string) {
-    const [tenant] = await db
-        .select({ id: tenants.id, schemaName: tenants.schemaName })
-        .from(tenants)
-        .where(eq(tenants.slug, tenantSlug))
-        .limit(1);
-    if (!tenant) throw new NotFoundError('Tenant');
-    return tenant;
+  const [tenant] = await db
+    .select({ id: tenants.id, schemaName: tenants.schemaName })
+    .from(tenants)
+    .where(eq(tenants.slug, tenantSlug))
+    .limit(1);
+  if (!tenant) throw new NotFoundError('Tenant');
+  return tenant;
 }

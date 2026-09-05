@@ -6,7 +6,7 @@ import { env } from '../../config/env.js';
 export type GatewayName = 'paystack' | 'flutterwave';
 
 export function getGateway(name?: GatewayName): PaymentGateway {
-  const selected = name ?? (env.DEFAULT_PAYMENT_GATEWAY) ?? 'paystack';
+  const selected = name ?? env.DEFAULT_PAYMENT_GATEWAY ?? 'paystack';
   if (selected === 'flutterwave') return flutterwaveGateway;
   return paystackGateway;
 }

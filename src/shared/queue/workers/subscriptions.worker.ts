@@ -23,6 +23,8 @@ createWorker<SubscriptionJobData>(QUEUES.SUBSCRIPTIONS, async (job) => {
   }
 
   if (job.name === 'billing-retry') {
-    await startGracePeriod(schemaName, tenantId).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
+    await startGracePeriod(schemaName, tenantId).catch(() => {
+      /* non-fatal: secondary failure intentionally ignored */
+    });
   }
 });

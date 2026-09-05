@@ -29,7 +29,8 @@ import { calculateOrderTotals } from './calculations.js';
  * The DO block uses entirely static SQL (no user input interpolated), so sql.raw() is safe.
  */
 async function getNextOrderNumber(db: TenantDb): Promise<string> {
-  await db.execute(sql.raw(`
+  await db.execute(
+    sql.raw(`
     DO $$ BEGIN
       CREATE SEQUENCE order_number_seq;
       PERFORM setval('order_number_seq',
@@ -38,7 +39,8 @@ async function getNextOrderNumber(db: TenantDb): Promise<string> {
     EXCEPTION WHEN duplicate_table THEN
       NULL;
     END $$
-  `));
+  `),
+  );
 
   const result = await db.execute(sql`SELECT nextval('order_number_seq') AS num`);
   const rows = result.rows;
@@ -74,11 +76,7 @@ export interface CreateOrderInput {
   merchantShippingCostKobo?: number;
 }
 
-export async function createOrder(
-  schemaName: string,
-  _userId: string,
-  input: CreateOrderInput,
-) {
+export async function createOrder(schemaName: string, _userId: string, input: CreateOrderInput) {
   if (input.items.length === 0) {
     throw new ValidationError('Order must have at least one item');
   }
@@ -98,8 +96,11 @@ export async function createOrder(
 
     const itemsWithTax = input.items.map((item) => ({
       ...item,
-      taxKobo: item.taxKobo ??
-        Math.floor(item.quantity * item.unitPriceKobo * (taxRateMap.get(item.variantId) ?? 0) / 10000),
+      taxKobo:
+        item.taxKobo ??
+        Math.floor(
+          (item.quantity * item.unitPriceKobo * (taxRateMap.get(item.variantId) ?? 0)) / 10000,
+        ),
     }));
 
     const { subtotalKobo, totalKobo, lineTotalsKobo } = calculateOrderTotals(
@@ -213,17 +214,10 @@ export async function listOrders(
 
 export async function getOrder(schemaName: string, orderId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
-    const items = await db
-      .select()
-      .from(orderItems)
-      .where(eq(orderItems.orderId, orderId));
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
 
     return { ...order, items };
   });
@@ -243,88 +237,77 @@ export async function confirmOrder(
   // transaction. For full ACID guarantees, migrate to the Neon WebSocket driver
   // with drizzle's db.transaction(). The single-session approach still eliminates
   // the inter-session race that existed with separate withTenantSchema calls.
-  const { updatedOrder, variantIds, locationId } = await withTenantSchema(schemaName, async (db) => {
-    // 1. Load and validate order
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
-    if (!order) throw new NotFoundError('Order', orderId);
+  const { updatedOrder, variantIds, locationId } = await withTenantSchema(
+    schemaName,
+    async (db) => {
+      // 1. Load and validate order
+      const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+      if (!order) throw new NotFoundError('Order', orderId);
 
-    assertTransition(order.status, 'confirmed');
+      assertTransition(order.status, 'confirmed');
 
-    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-    if (items.length === 0) throw new ValidationError('Order has no items');
+      const items = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+      if (items.length === 0) throw new ValidationError('Order has no items');
 
-    const loc = order.locationId;
-    if (!loc) throw new ValidationError('Order must have a location to confirm');
+      const loc = order.locationId;
+      if (!loc) throw new ValidationError('Order must have a location to confirm');
 
-    // 2. Validate stock and deduct immediately per item
-    for (const item of items) {
-      const [inv] = await db
-        .select({ quantityOnHand: inventory.quantityOnHand })
-        .from(inventory)
-        .where(
-          and(
-            eq(inventory.variantId, item.variantId),
-            eq(inventory.locationId, loc),
-          ),
-        )
-        .limit(1);
-
-      if (!inv || inv.quantityOnHand < item.quantity) {
-        const [variant] = await db
-          .select({ name: productVariants.name, sku: productVariants.sku })
-          .from(productVariants)
-          .where(eq(productVariants.id, item.variantId))
+      // 2. Validate stock and deduct immediately per item
+      for (const item of items) {
+        const [inv] = await db
+          .select({ quantityOnHand: inventory.quantityOnHand })
+          .from(inventory)
+          .where(and(eq(inventory.variantId, item.variantId), eq(inventory.locationId, loc)))
           .limit(1);
-        throw new ValidationError(
-          `Insufficient stock for '${variant?.name ?? item.variantId}' (SKU: ${variant?.sku ?? '?'})`,
-        );
+
+        if (!inv || inv.quantityOnHand < item.quantity) {
+          const [variant] = await db
+            .select({ name: productVariants.name, sku: productVariants.sku })
+            .from(productVariants)
+            .where(eq(productVariants.id, item.variantId))
+            .limit(1);
+          throw new ValidationError(
+            `Insufficient stock for '${variant?.name ?? item.variantId}' (SKU: ${variant?.sku ?? '?'})`,
+          );
+        }
+
+        await db
+          .update(inventory)
+          .set({
+            quantityOnHand: sql`${inventory.quantityOnHand} - ${item.quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(inventory.variantId, item.variantId), eq(inventory.locationId, loc)));
+
+        await db.insert(stockMovements).values({
+          id: uuidv4(),
+          variantId: item.variantId,
+          locationId: loc,
+          type: 'sale',
+          quantity: item.quantity,
+          referenceId: orderId,
+          referenceType: 'order',
+          createdBy: userId,
+        });
       }
 
+      // 3. Update order status
       await db
-        .update(inventory)
-        .set({
-          quantityOnHand: sql`${inventory.quantityOnHand} - ${item.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(inventory.variantId, item.variantId),
-            eq(inventory.locationId, loc),
-          ),
-        );
+        .update(orders)
+        .set({ status: 'confirmed', updatedAt: new Date() })
+        .where(eq(orders.id, orderId));
 
-      await db.insert(stockMovements).values({
-        id: uuidv4(),
-        variantId: item.variantId,
+      // 4. Re-read and return the updated order
+      const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
+      if (!updated) throw new NotFoundError('Order', orderId);
+
+      return {
+        updatedOrder: updated,
+        variantIds: items.map((i) => i.variantId),
         locationId: loc,
-        type: 'sale',
-        quantity: item.quantity,
-        referenceId: orderId,
-        referenceType: 'order',
-        createdBy: userId,
-      });
-    }
-
-    // 3. Update order status
-    await db
-      .update(orders)
-      .set({ status: 'confirmed', updatedAt: new Date() })
-      .where(eq(orders.id, orderId));
-
-    // 4. Re-read and return the updated order
-    const [updated] = await db.select().from(orders).where(eq(orders.id, orderId));
-    if (!updated) throw new NotFoundError('Order', orderId);
-
-    return {
-      updatedOrder: updated,
-      variantIds: items.map((i) => i.variantId),
-      locationId: loc,
-    };
-  });
+      };
+    },
+  );
 
   // Enqueue low-stock alerts asynchronously (non-blocking on failure)
   await checkAndEnqueueLowStockAlerts(
@@ -342,11 +325,7 @@ export async function confirmOrder(
 
 export async function processOrder(schemaName: string, orderId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
     assertTransition(order.status, 'processing');
@@ -364,11 +343,7 @@ export async function processOrder(schemaName: string, orderId: string) {
 
 export async function fulfillOrder(schemaName: string, orderId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
     assertTransition(order.status, 'fulfilled');
@@ -384,20 +359,12 @@ export async function fulfillOrder(schemaName: string, orderId: string) {
   });
 }
 
-export async function cancelOrder(
-  schemaName: string,
-  orderId: string,
-  userId: string,
-) {
+export async function cancelOrder(schemaName: string, orderId: string, userId: string) {
   // All validation, stock restoration, and status update happen in a single session.
   // See confirmOrder for notes on Neon HTTP driver and transactional guarantees.
   return withTenantSchema(schemaName, async (db) => {
     // 1. Load and validate
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
     assertTransition(order.status, 'cancelled');

@@ -128,10 +128,7 @@ export async function updateStaffMember(
     if (input.locationId !== undefined) updateData['locationId'] = input.locationId;
     if (input.isActive !== undefined) updateData['isActive'] = input.isActive;
 
-    await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, userId));
+    await db.update(users).set(updateData).where(eq(users.id, userId));
 
     const [updated] = await db
       .select({

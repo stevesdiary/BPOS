@@ -60,10 +60,7 @@ export async function receiveStock(
       .select({ id: inventory.id })
       .from(inventory)
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       )
       .limit(1);
 
@@ -81,10 +78,7 @@ export async function receiveStock(
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       );
 
     const movementId = uuidv4();
@@ -102,10 +96,7 @@ export async function receiveStock(
       .select()
       .from(inventory)
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       );
     return updated!;
   });
@@ -126,10 +117,7 @@ export async function adjustStock(
       .select()
       .from(inventory)
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       )
       .limit(1);
 
@@ -154,10 +142,7 @@ export async function adjustStock(
         updatedAt: new Date(),
       })
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       );
 
     const movementId = uuidv4();
@@ -175,10 +160,7 @@ export async function adjustStock(
       .select()
       .from(inventory)
       .where(
-        and(
-          eq(inventory.variantId, input.variantId),
-          eq(inventory.locationId, input.locationId),
-        ),
+        and(eq(inventory.variantId, input.variantId), eq(inventory.locationId, input.locationId)),
       );
     return updated!;
   });
@@ -226,9 +208,7 @@ export async function listMovements(
 
 export async function getLowStock(schemaName: string, locationId?: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const conditions = [
-      sql`${inventory.quantityOnHand} <= ${inventory.lowStockThreshold}`,
-    ];
+    const conditions = [sql`${inventory.quantityOnHand} <= ${inventory.lowStockThreshold}`];
     if (locationId) conditions.push(eq(inventory.locationId, locationId));
 
     return db
@@ -270,9 +250,7 @@ export async function checkAndEnqueueLowStockAlerts(
       })
       .from(inventory)
       .leftJoin(productVariants, eq(inventory.variantId, productVariants.id))
-      .where(
-        and(inArray(inventory.variantId, variantIds), eq(inventory.locationId, locationId)),
-      ),
+      .where(and(inArray(inventory.variantId, variantIds), eq(inventory.locationId, locationId))),
   );
 
   for (const level of updatedLevels) {

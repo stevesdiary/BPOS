@@ -31,10 +31,7 @@ export async function getRevenueByLocation(
   });
 }
 
-export async function getStaffSales(
-  ctx: RequestContext,
-  query: { from?: string; to?: string },
-) {
+export async function getStaffSales(ctx: RequestContext, query: { from?: string; to?: string }) {
   return service.getStaffSalesReport(ctx.schema, {
     ...(query.from && { from: query.from }),
     ...(query.to && { to: query.to }),
@@ -64,10 +61,7 @@ export async function exportPL(ctx: RequestContext, from: string, to: string) {
   ]);
 }
 
-export async function exportStaffSales(
-  ctx: RequestContext,
-  query: { from?: string; to?: string },
-) {
+export async function exportStaffSales(ctx: RequestContext, query: { from?: string; to?: string }) {
   const rows = await service.getStaffSalesReport(ctx.schema, {
     ...(query.from && { from: query.from }),
     ...(query.to && { to: query.to }),

@@ -28,9 +28,7 @@ export async function handleWebhook(
 ) {
   if (meta['type'] === 'subscription') {
     // Import here to avoid circular dependency
-    const { handleSubscriptionBillingWebhook } = await import(
-      '../subscriptions/service.js'
-    );
+    const { handleSubscriptionBillingWebhook } = await import('../subscriptions/service.js');
     const tenantId = (meta['tenantId'] as string) ?? '';
     const planTier = (meta['planTier'] as string) ?? '';
     const rawData = data as unknown as Record<string, unknown>;
@@ -44,7 +42,9 @@ export async function handleWebhook(
       planTier as 'entry' | 'growth' | 'enterprise',
       (authorization?.['authorization_code'] as string) ?? '',
       (customer?.['customer_code'] as string) ?? '',
-    ).catch(() => {/* non-fatal: secondary failure intentionally ignored */});
+    ).catch(() => {
+      /* non-fatal: secondary failure intentionally ignored */
+    });
   } else {
     await handlePaystackWebhook(schemaName, eventType, data);
   }

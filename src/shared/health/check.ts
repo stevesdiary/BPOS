@@ -76,9 +76,21 @@ async function checkQueues(): Promise<ComponentCheck> {
   const start = Date.now();
   try {
     // Dynamic import to avoid circular dependencies
-    const { notificationsQueue, documentsQueue, paymentsQueue, subscriptionsQueue, logisticsQueue } = await import('../queue/client.js');
+    const {
+      notificationsQueue,
+      documentsQueue,
+      paymentsQueue,
+      subscriptionsQueue,
+      logisticsQueue,
+    } = await import('../queue/client.js');
 
-    const queues = [notificationsQueue, documentsQueue, paymentsQueue, subscriptionsQueue, logisticsQueue];
+    const queues = [
+      notificationsQueue,
+      documentsQueue,
+      paymentsQueue,
+      subscriptionsQueue,
+      logisticsQueue,
+    ];
     const results = await Promise.allSettled(
       queues.map(async (q) => {
         const counts = await q.getJobCounts('waiting', 'active', 'completed', 'failed');

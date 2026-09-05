@@ -75,10 +75,7 @@ export async function loginUser(
 
   // Update last login
   await withTenantSchema(schemaName, async (tenantDb) => {
-    await tenantDb
-      .update(users)
-      .set({ lastLoginAt: new Date() })
-      .where(eq(users.id, user.id));
+    await tenantDb.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   });
 
   return {
@@ -183,10 +180,7 @@ export async function refreshAccessToken(
   return app.jwt.sign(payload);
 }
 
-export async function revokeRefreshToken(
-  tenantId: string,
-  rawRefreshToken: string,
-): Promise<void> {
+export async function revokeRefreshToken(tenantId: string, rawRefreshToken: string): Promise<void> {
   const tokenPrefix = rawRefreshToken.slice(0, TOKEN_PREFIX_LENGTH);
 
   const [matched] = await db

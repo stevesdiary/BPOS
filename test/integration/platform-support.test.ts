@@ -376,7 +376,7 @@ describe('merchant visibility of support access', () => {
     });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ data: { items: Array<Record<string, unknown>> } }>();
+    const body = res.json<{ data: { items: Record<string, unknown>[] } }>();
     const entry = body.data.items.find((e) => e['action'] === 'support.access_granted');
     expect(entry).toBeDefined();
     expect(entry?.['reason']).toBe(reason);

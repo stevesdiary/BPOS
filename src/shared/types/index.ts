@@ -37,8 +37,8 @@ export interface PlatformJwtPayload {
 }
 
 export interface JwtPayload {
-  sub: string;       // userId
-  tid: string;       // tenantId
+  sub: string; // userId
+  tid: string; // tenantId
   role: UserRole;
   email: string;
   type: 'access' | 'refresh';
@@ -53,19 +53,19 @@ export interface TenantRecord {
   createdAt: Date;
 }
 
-export type ApiSuccess<T> = {
+export interface ApiSuccess<T> {
   success: true;
   data: T;
-};
+}
 
-export type ApiError = {
+export interface ApiError {
   success: false;
   error: {
     code: string;
     message: string;
     details?: unknown;
   };
-};
+}
 
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
 
@@ -81,4 +81,3 @@ export interface PaginatedResult<T> {
   limit: number;
   totalPages: number;
 }
-

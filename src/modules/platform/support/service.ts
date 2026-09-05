@@ -249,7 +249,7 @@ export async function retryWebhook(ctx: PlatformContext, schemaName: string, raw
   const { handlePaystackWebhook } = await import('../../payments/service.js');
   const result = await handlePaystackWebhook(
     schemaName,
-    parsed.event as Parameters<typeof handlePaystackWebhook>[1],
+    parsed.event,
     parsed.data as Parameters<typeof handlePaystackWebhook>[2],
   );
 

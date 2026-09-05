@@ -17,25 +17,29 @@ export default function tenantRoutes(app: FastifyInstance) {
   // NOTE: this does not verify ownership of businessEmail. Email-verified
   // signup is tracked as follow-up work; until then, admin-initiated
   // provisioning via POST /v1/platform/tenants is the vetted path.
-  typed.post('/', {
-    config: { rateLimit: { max: 3, timeWindow: '1 hour' } },
-    schema: {
-      tags: ['Tenants'],
-      summary: 'Provision a new merchant tenant (public signup)',
-      description:
-        'Creates an isolated tenant schema, seeds default data, and registers the owner ' +
-        'account. Rate limited to 3 per hour per IP.',
-      security: [],
-      body: createTenantBodySchema,
+  typed.post(
+    '/',
+    {
+      config: { rateLimit: { max: 3, timeWindow: '1 hour' } },
+      schema: {
+        tags: ['Tenants'],
+        summary: 'Provision a new merchant tenant (public signup)',
+        description:
+          'Creates an isolated tenant schema, seeds default data, and registers the owner ' +
+          'account. Rate limited to 3 per hour per IP.',
+        security: [],
+        body: createTenantBodySchema,
+      },
     },
-  }, async (request, reply) => {
-    // No createContext() here: this route runs before any tenant or user
-    // exists, so there is no RequestContext to build.
-    const result = await controller.create(request.body);
-    return sendCreated(reply, {
-      tenantId: result.tenantId,
-      slug: result.slug,
-      message: 'Tenant provisioned successfully. Use your business email to log in.',
-    });
-  });
+    async (request, reply) => {
+      // No createContext() here: this route runs before any tenant or user
+      // exists, so there is no RequestContext to build.
+      const result = await controller.create(request.body);
+      return sendCreated(reply, {
+        tenantId: result.tenantId,
+        slug: result.slug,
+        message: 'Tenant provisioned successfully. Use your business email to log in.',
+      });
+    },
+  );
 }

@@ -75,10 +75,7 @@ export async function loginUser(
 
   // Update last login
   await withTenantSchema(schemaName, async (tenantDb) => {
-    await tenantDb
-      .update(users)
-      .set({ lastLoginAt: new Date() })
-      .where(eq(users.id, user.id));
+    await tenantDb.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   });
 
   return {
@@ -183,10 +180,7 @@ export async function refreshAccessToken(
   return app.jwt.sign(payload);
 }
 
-export async function revokeRefreshToken(
-  tenantId: string,
-  rawRefreshToken: string,
-): Promise<void> {
+export async function revokeRefreshToken(tenantId: string, rawRefreshToken: string): Promise<void> {
   const tokenPrefix = rawRefreshToken.slice(0, TOKEN_PREFIX_LENGTH);
 
   const [matched] = await db
@@ -322,11 +316,11 @@ export async function resetPassword(
     const [updated] = await tenantDb
       .update(users)
       .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(users.id, matched!.userId))
+      .where(eq(users.id, matched.userId))
       .returning({ id: users.id });
 
     if (!updated) {
-      throw new NotFoundError('User', matched!.userId);
+      throw new NotFoundError('User', matched.userId);
     }
   });
 

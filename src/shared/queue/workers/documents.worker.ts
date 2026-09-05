@@ -5,7 +5,13 @@ import { updateInvoicePdf } from '../../../modules/invoicing/service.js';
 import { withTenantSchema } from '../../db/tenant.js';
 import { db } from '../../db/client.js';
 import { tenants } from '../../db/schema/public.js';
-import { orders, orderItems, productVariants, customers, invoices } from '../../db/schema/tenant.js';
+import {
+  orders,
+  orderItems,
+  productVariants,
+  customers,
+  invoices,
+} from '../../db/schema/tenant.js';
 import { renderInvoicePdf } from '../../pdf/invoice.js';
 import { uploadToR2 } from '../../storage/r2.js';
 import { sendInvoiceEmail } from '../../email/resend.js';
@@ -28,19 +34,11 @@ createWorker<GenerateInvoiceJobData>(QUEUES.DOCUMENTS, async (job) => {
 
   // ── 2. Fetch order + line items + customer from tenant schema ─────────────────
   const invoiceData = await withTenantSchema(schemaName, async (tdb) => {
-    const [invoice] = await tdb
-      .select()
-      .from(invoices)
-      .where(eq(invoices.id, invoiceId))
-      .limit(1);
+    const [invoice] = await tdb.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
 
     if (!invoice) throw new Error(`Invoice ${invoiceId} not found`);
 
-    const [order] = await tdb
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await tdb.select().from(orders).where(eq(orders.id, orderId)).limit(1);
 
     if (!order) throw new Error(`Order ${orderId} not found`);
 
@@ -58,7 +56,13 @@ createWorker<GenerateInvoiceJobData>(QUEUES.DOCUMENTS, async (job) => {
       .innerJoin(productVariants, eq(orderItems.variantId, productVariants.id))
       .where(eq(orderItems.orderId, orderId));
 
-    let customer: { firstName: string; lastName: string | null; email: string | null; phone: string | null; address: string | null } | null = null;
+    let customer: {
+      firstName: string;
+      lastName: string | null;
+      email: string | null;
+      phone: string | null;
+      address: string | null;
+    } | null = null;
     if (order.customerId) {
       const [c] = await tdb
         .select({

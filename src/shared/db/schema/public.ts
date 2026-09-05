@@ -76,9 +76,9 @@ export const tenantIntegrations = pgTable(
       .notNull()
       .references(() => tenants.id, { onDelete: 'cascade' }),
     integrationType: text('integration_type').notNull(), // 'logistics'
-    providerName: text('provider_name').notNull(),       // 'sendstack', 'gig', 'dhl', etc.
+    providerName: text('provider_name').notNull(), // 'sendstack', 'gig', 'dhl', etc.
     apiKeyEncrypted: text('api_key_encrypted').notNull(), // AES-256-GCM, base64
-    config: jsonb('config'),                              // baseUrl, webhookSecret, etc.
+    config: jsonb('config'), // baseUrl, webhookSecret, etc.
     isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

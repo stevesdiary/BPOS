@@ -11,10 +11,7 @@ export async function updateInvoicePdf(
   pdfUrl: string,
 ): Promise<void> {
   await withTenantSchema(schemaName, async (db) => {
-    await db
-      .update(invoices)
-      .set({ pdfUrl, status: 'sent' })
-      .where(eq(invoices.id, invoiceId));
+    await db.update(invoices).set({ pdfUrl, status: 'sent' }).where(eq(invoices.id, invoiceId));
   });
 }
 
@@ -25,17 +22,9 @@ export interface GenerateInvoiceJobData {
   orderId: string;
 }
 
-export async function generateInvoice(
-  schemaName: string,
-  tenantId: string,
-  orderId: string,
-) {
+export async function generateInvoice(schemaName: string, tenantId: string, orderId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [order] = await db
-      .select()
-      .from(orders)
-      .where(eq(orders.id, orderId))
-      .limit(1);
+    const [order] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
     if (!order) throw new NotFoundError('Order', orderId);
 
     // Sequential invoice number
@@ -66,20 +55,12 @@ export async function generateInvoice(
 
 export async function getInvoice(schemaName: string, invoiceId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [invoice] = await db
-      .select()
-      .from(invoices)
-      .where(eq(invoices.id, invoiceId))
-      .limit(1);
+    const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
     if (!invoice) throw new NotFoundError('Invoice', invoiceId);
 
     // Attach order + line items for rendering
     if (invoice.orderId) {
-      const [order] = await db
-        .select()
-        .from(orders)
-        .where(eq(orders.id, invoice.orderId))
-        .limit(1);
+      const [order] = await db.select().from(orders).where(eq(orders.id, invoice.orderId)).limit(1);
 
       const items = await db
         .select({

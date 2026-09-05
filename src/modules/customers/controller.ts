@@ -1,10 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
-import {
-  createCustomer,
-  listCustomers,
-  getCustomer,
-  updateCustomer,
-} from './service.js';
+import { createCustomer, listCustomers, getCustomer, updateCustomer } from './service.js';
 
 export async function create(
   ctx: RequestContext,

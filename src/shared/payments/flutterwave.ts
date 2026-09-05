@@ -1,6 +1,11 @@
 import crypto from 'crypto';
 import { env } from '../../config/env.js';
-import type { PaymentGateway, InitiatePaymentInput, InitiatePaymentResult, VerifyPaymentResult } from './gateway.js';
+import type {
+  PaymentGateway,
+  InitiatePaymentInput,
+  InitiatePaymentResult,
+  VerifyPaymentResult,
+} from './gateway.js';
 
 const FW_BASE = 'https://api.flutterwave.com/v3';
 
@@ -30,8 +35,8 @@ interface FwInitData {
 
 interface FwVerifyData {
   status: string;
-  amount: number;       // NGN
-  app_fee: number;      // NGN
+  amount: number; // NGN
+  app_fee: number; // NGN
   currency: string;
   flw_ref: string;
   created_at: string;
@@ -45,7 +50,7 @@ export const flutterwaveGateway: PaymentGateway = {
       method: 'POST',
       body: JSON.stringify({
         tx_ref: input.reference,
-        amount: input.amountKobo / 100,  // Flutterwave expects NGN (naira)
+        amount: input.amountKobo / 100, // Flutterwave expects NGN (naira)
         currency: 'NGN',
         redirect_url: input.callbackUrl,
         customer: { email: input.email },
@@ -57,14 +62,14 @@ export const flutterwaveGateway: PaymentGateway = {
 
   async verifyPayment(reference: string): Promise<VerifyPaymentResult> {
     // Flutterwave verify by tx_ref uses the search endpoint
-    const data = await fwRequest<FwVerifyData[]>(`/transactions?tx_ref=${encodeURIComponent(reference)}`);
+    const data = await fwRequest<FwVerifyData[]>(
+      `/transactions?tx_ref=${encodeURIComponent(reference)}`,
+    );
     const tx = data[0];
     if (!tx) throw new Error(`Transaction not found: ${reference}`);
 
     const status =
-      tx.status === 'successful' ? 'success'
-      : tx.status === 'abandoned' ? 'abandoned'
-      : 'failed';
+      tx.status === 'successful' ? 'success' : tx.status === 'abandoned' ? 'abandoned' : 'failed';
 
     return {
       status,

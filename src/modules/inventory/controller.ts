@@ -1,11 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
-import {
-  listInventory,
-  receiveStock,
-  adjustStock,
-  listMovements,
-  getLowStock,
-} from './service.js';
+import { listInventory, receiveStock, adjustStock, listMovements, getLowStock } from './service.js';
 
 export async function list(
   ctx: RequestContext,

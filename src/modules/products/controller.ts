@@ -11,7 +11,10 @@ import {
   updateVariant,
 } from './service.js';
 
-function sanitizeVariant(v: ProductVariant, hideMargin: boolean): Omit<ProductVariant, 'costKobo'> | ProductVariant {
+function sanitizeVariant(
+  v: ProductVariant,
+  hideMargin: boolean,
+): Omit<ProductVariant, 'costKobo'> | ProductVariant {
   if (!hideMargin) return v;
   const { costKobo: _cost, ...safe } = v;
   return safe;

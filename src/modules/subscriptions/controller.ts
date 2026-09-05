@@ -3,11 +3,7 @@ import type { PlanTier } from '../../config/features.js';
 import { db } from '../../shared/db/client.js';
 import { tenants } from '../../shared/db/schema/public.js';
 import { eq } from 'drizzle-orm';
-import {
-  getSubscription,
-  initiateSubscription,
-  cancelSubscription,
-} from './service.js';
+import { getSubscription, initiateSubscription, cancelSubscription } from './service.js';
 
 export async function getSubscriptionHandler(ctx: RequestContext) {
   return getSubscription(ctx.schema);

@@ -41,7 +41,11 @@ export async function listZones(ctx: RequestContext) {
   return listShippingZones(ctx.schema);
 }
 
-export async function updateZone(ctx: RequestContext, zoneId: string, input: { name?: string; states?: string[] }) {
+export async function updateZone(
+  ctx: RequestContext,
+  zoneId: string,
+  input: { name?: string; states?: string[] },
+) {
   return updateShippingZone(ctx.schema, zoneId, input);
 }
 
@@ -59,7 +63,11 @@ export async function listMethods(ctx: RequestContext) {
   return listShippingMethods(ctx.schema);
 }
 
-export async function updateMethod(ctx: RequestContext, methodId: string, input: Partial<CreateShippingMethodInput> & { isActive?: boolean }) {
+export async function updateMethod(
+  ctx: RequestContext,
+  methodId: string,
+  input: Partial<CreateShippingMethodInput> & { isActive?: boolean },
+) {
   return updateShippingMethod(ctx.schema, methodId, input);
 }
 
@@ -79,7 +87,17 @@ export async function deleteRate(ctx: RequestContext, rateId: string) {
 
 // ── Free Shipping Conditions ───────────────────────────────────────────────────
 
-export async function addCondition(ctx: RequestContext, methodId: string, input: { conditionType: string; thresholdKobo?: number; productId?: string; categoryId?: string; promoCode?: string }) {
+export async function addCondition(
+  ctx: RequestContext,
+  methodId: string,
+  input: {
+    conditionType: string;
+    thresholdKobo?: number;
+    productId?: string;
+    categoryId?: string;
+    promoCode?: string;
+  },
+) {
   return addFreeShippingCondition(ctx.schema, methodId, input as never);
 }
 
@@ -93,7 +111,19 @@ export async function deleteCondition(ctx: RequestContext, conditionId: string) 
 
 // ── Pick-up Locations ──────────────────────────────────────────────────────────
 
-export async function createPickup(ctx: RequestContext, input: { name: string; locationType: string; locationId?: string; providerName?: string; address: string; state?: string; phone?: string; operatingHours?: string }) {
+export async function createPickup(
+  ctx: RequestContext,
+  input: {
+    name: string;
+    locationType: string;
+    locationId?: string;
+    providerName?: string;
+    address: string;
+    state?: string;
+    phone?: string;
+    operatingHours?: string;
+  },
+) {
   return createPickupLocation(ctx.schema, input as never);
 }
 
@@ -104,7 +134,18 @@ export async function listPickups(ctx: RequestContext, query: { state?: string }
   });
 }
 
-export async function updatePickup(ctx: RequestContext, locationId: string, input: { name?: string; address?: string; state?: string; phone?: string; operatingHours?: string; isActive?: boolean }) {
+export async function updatePickup(
+  ctx: RequestContext,
+  locationId: string,
+  input: {
+    name?: string;
+    address?: string;
+    state?: string;
+    phone?: string;
+    operatingHours?: string;
+    isActive?: boolean;
+  },
+) {
   return updatePickupLocation(ctx.schema, locationId, input);
 }
 

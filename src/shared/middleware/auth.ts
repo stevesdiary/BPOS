@@ -26,16 +26,10 @@ export function requireRole(...roles: UserRole[]) {
   };
 }
 
-export async function requireOwner(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> {
+export async function requireOwner(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   return requireRole('owner')(request, reply);
 }
 
-export async function requireManager(
-  request: FastifyRequest,
-  reply: FastifyReply,
-): Promise<void> {
+export async function requireManager(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   return requireRole('owner', 'manager')(request, reply);
 }

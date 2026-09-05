@@ -206,7 +206,7 @@ describe('Products API', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ data: { variants: Array<Record<string, unknown>> } }>();
+    const body = response.json<{ data: { variants: Record<string, unknown>[] } }>();
     const variant = body.data.variants[0]!;
     expect(variant).toHaveProperty('costKobo');
     expect(variant['costKobo']).toBe(25000);
@@ -220,7 +220,7 @@ describe('Products API', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const body = response.json<{ data: { variants: Array<Record<string, unknown>> } }>();
+    const body = response.json<{ data: { variants: Record<string, unknown>[] } }>();
     const variant = body.data.variants[0]!;
     expect(variant).not.toHaveProperty('costKobo');
     // Staff can still see sales price and tax rate

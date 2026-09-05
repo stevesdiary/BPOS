@@ -1,4 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import { listInventory, receiveStock, adjustStock, listMovements, getLowStock } from './service.js';
 
 export async function list(
@@ -17,7 +18,14 @@ export async function receive(
     note?: string;
   },
 ) {
-  return receiveStock(ctx.schema, ctx.userId, input);
+  const result = await receiveStock(ctx.schema, ctx.userId, input);
+  await auditUserAction(ctx, {
+    action: 'inventory.stock_received',
+    targetType: 'variant',
+    targetId: input.variantId,
+    metadata: { locationId: input.locationId, quantity: input.quantity },
+  });
+  return result;
 }
 
 export async function adjust(
@@ -29,7 +37,15 @@ export async function adjust(
     note?: string;
   },
 ) {
-  return adjustStock(ctx.schema, ctx.userId, input);
+  const result = await adjustStock(ctx.schema, ctx.userId, input);
+  await auditUserAction(ctx, {
+    action: 'inventory.stock_adjusted',
+    targetType: 'variant',
+    targetId: input.variantId,
+    metadata: { locationId: input.locationId, quantity: input.quantity },
+    ...(input.note && { reason: input.note }),
+  });
+  return result;
 }
 
 export async function movements(

@@ -1,4 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import {
   listLocations,
   getLocation,
@@ -24,7 +25,14 @@ export async function create(
     isDefault?: boolean;
   },
 ) {
-  return createLocation(ctx.schema, input);
+  const location = await createLocation(ctx.schema, input);
+  await auditUserAction(ctx, {
+    action: 'location.created',
+    targetType: 'location',
+    targetId: location.id,
+    metadata: { name: input.name },
+  });
+  return location;
 }
 
 export async function update(
@@ -38,9 +46,22 @@ export async function update(
     isActive: boolean;
   }>,
 ) {
-  return updateLocation(ctx.schema, id, input);
+  const location = await updateLocation(ctx.schema, id, input);
+  await auditUserAction(ctx, {
+    action: 'location.updated',
+    targetType: 'location',
+    targetId: id,
+    metadata: { fields: Object.keys(input) },
+  });
+  return location;
 }
 
 export async function deactivate(ctx: RequestContext, id: string) {
-  return deactivateLocation(ctx.schema, id);
+  const result = await deactivateLocation(ctx.schema, id);
+  await auditUserAction(ctx, {
+    action: 'location.deactivated',
+    targetType: 'location',
+    targetId: id,
+  });
+  return result;
 }

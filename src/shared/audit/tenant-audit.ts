@@ -56,6 +56,45 @@ export async function writeTenantAudit(schemaName: string, input: TenantAuditInp
   }
 }
 
+/**
+ * The subset of a merchant RequestContext an audit entry needs. Declared
+ * structurally so this module stays decoupled from the controller layer while
+ * still accepting a full RequestContext.
+ */
+export interface AuditActor {
+  schema: string;
+  userId: string;
+  email: string;
+}
+
+/**
+ * Record a merchant-plane action on the tenant's own activity trail, attributed
+ * to the acting user. Call it from the controller layer after the mutation
+ * succeeds: the controller holds the actor identity, and keeping the write out
+ * of the service leaves services reusable by support tooling without
+ * mis-attributing platform access as a merchant action.
+ *
+ * Inherits writeTenantAudit's non-throwing contract: a failed audit write is
+ * logged, never surfaced to the caller.
+ */
+export async function auditUserAction(
+  actor: AuditActor,
+  entry: {
+    action: string;
+    targetType?: string;
+    targetId?: string;
+    reason?: string;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await writeTenantAudit(actor.schema, {
+    actorType: 'user',
+    actorId: actor.userId,
+    actorEmail: actor.email,
+    ...entry,
+  });
+}
+
 export interface TenantAuditQuery {
   actorType?: AuditActorType;
   action?: string;

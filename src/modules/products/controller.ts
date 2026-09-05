@@ -1,5 +1,6 @@
 import type { RequestContext } from '../../shared/types/controller.js';
 import type { ProductVariant } from '../../shared/db/schema/tenant.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import {
   createCategory,
   listCategories,
@@ -24,7 +25,14 @@ export async function createCategoryHandler(
   ctx: RequestContext,
   input: { name: string; parentId?: string },
 ) {
-  return createCategory(ctx.schema, input);
+  const category = await createCategory(ctx.schema, input);
+  await auditUserAction(ctx, {
+    action: 'category.created',
+    targetType: 'category',
+    targetId: category.id,
+    metadata: { name: input.name },
+  });
+  return category;
 }
 
 export async function listCategoriesHandler(ctx: RequestContext) {
@@ -40,7 +48,14 @@ export async function createProductHandler(
     imageUrl?: string;
   },
 ) {
-  return createProduct(ctx.schema, input);
+  const product = await createProduct(ctx.schema, input);
+  await auditUserAction(ctx, {
+    action: 'product.created',
+    targetType: 'product',
+    targetId: product.id,
+    metadata: { name: input.name },
+  });
+  return product;
 }
 
 export async function listProductsHandler(
@@ -82,7 +97,14 @@ export async function updateProductHandler(
     isActive: boolean;
   }>,
 ) {
-  return updateProduct(ctx.schema, id, input);
+  const product = await updateProduct(ctx.schema, id, input);
+  await auditUserAction(ctx, {
+    action: 'product.updated',
+    targetType: 'product',
+    targetId: id,
+    metadata: { fields: Object.keys(input) },
+  });
+  return product;
 }
 
 export async function createVariantHandler(
@@ -97,7 +119,14 @@ export async function createVariantHandler(
     attributes?: string;
   },
 ) {
-  return createVariant(ctx.schema, productId, input);
+  const variant = await createVariant(ctx.schema, productId, input);
+  await auditUserAction(ctx, {
+    action: 'product.variant_created',
+    targetType: 'product_variant',
+    targetId: variant.id,
+    metadata: { productId, sku: input.sku, priceKobo: input.priceKobo },
+  });
+  return variant;
 }
 
 export async function updateVariantHandler(
@@ -113,5 +142,16 @@ export async function updateVariantHandler(
     isActive: boolean;
   }>,
 ) {
-  return updateVariant(ctx.schema, productId, variantId, input);
+  const variant = await updateVariant(ctx.schema, productId, variantId, input);
+  await auditUserAction(ctx, {
+    action: 'product.variant_updated',
+    targetType: 'product_variant',
+    targetId: variantId,
+    metadata: {
+      productId,
+      fields: Object.keys(input),
+      ...(input.priceKobo !== undefined && { priceKobo: input.priceKobo }),
+    },
+  });
+  return variant;
 }

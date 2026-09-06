@@ -9,12 +9,14 @@
 import type { FastifyInstance } from 'fastify';
 import platformAuthRoutes from './auth/routes.js';
 import platformTenantRoutes from './tenants/routes.js';
+import platformUserRoutes from './users/routes.js';
 import platformAuditRoutes from './audit/routes.js';
 import platformSupportRoutes from './support/routes.js';
 
 export default async function platformRoutes(app: FastifyInstance) {
   await app.register(platformAuthRoutes, { prefix: '/auth' });
   await app.register(platformTenantRoutes, { prefix: '/tenants' });
+  await app.register(platformUserRoutes, { prefix: '/users' });
   await app.register(platformAuditRoutes, { prefix: '/audit' });
   await app.register(platformSupportRoutes, { prefix: '/support' });
 }

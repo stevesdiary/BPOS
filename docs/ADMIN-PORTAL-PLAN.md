@@ -1,8 +1,64 @@
 # Admin Portal — Implementation Plan
 
-**Status:** Proposed
+**Status:** In progress — Phase A and Phase B shipped; Phase C and D not started.
 **Depends on:** `development` @ `5a180bc`
 **Audiences:** business owner (merchant), support team (internal), super-admin (internal)
+
+> This document is the living plan. It was previously held only in a chat session and
+> was not committed, which meant every new session started blind. Keep the status table
+> in section 5 and the checkboxes below in sync with the code so that stops happening.
+
+---
+
+## 0. Status at a glance
+
+Reconstructed by diffing this plan against the code on
+`claude/admin-portal-implementation-20nolk` (merged via PR #8 Phase A, PR #9 Phase B).
+
+| Phase | State | Notes |
+|---|---|---|
+| A — Platform foundation | Shipped, 2 carve-outs | `POST /v1/tenants` only rate-limited (email verification outstanding); `tenants:delete` / `tenants:override_features` are permissions with no routes |
+| B — Support tooling | Shipped | Owner notification ships over SMS, not the email default assumed in §7 |
+| C — Owner admin | Not started | Only `GET /v1/settings/audit` exists (pulled forward in B). No mutating module writes to the tenant `auditLog` |
+| D — Platform intelligence | Not started | No `tenant_feature_overrides`, no analytics module |
+| Platform user management (`platform/users/`) | Not built, unphased | Cannot provision a second platform user via API — only a directly seeded super-admin exists |
+
+### Checklist
+
+Phase A
+- [x] Schema: `platform_users`, `platform_sessions`, `platform_audit_log`, `tenant_access_grants` + `platform_role_enum`
+- [x] Second JWT namespace + `JWT_PLATFORM_SECRET` (15m access / 8h refresh)
+- [x] `platform-auth.ts` middleware (`requirePlatformAuth`, `requirePlatformPermission`)
+- [x] `platform-permissions.ts` permission matrix
+- [x] Append-only audit write service
+- [x] `platform/auth` with TOTP (required for `super_admin` and `admin`)
+- [x] `platform/tenants`: list, detail, create, suspend, reactivate, change plan
+- [ ] Close `POST /v1/tenants` fully — email verification for public signup still outstanding
+- [ ] `tenants:delete` (soft) + retention window (§4.5) — permission exists, no route
+- [ ] `tenants:override_features` — permission exists, no route
+- [ ] `GET /v1/platform/tenants/:id/health`
+
+Phase B
+- [x] `tenant_access_grants` + `requireTenantGrant`
+- [x] Support read endpoints reusing existing tenant services
+- [x] Four repair actions (resend-receipt, retry-webhook, unlock-account, reset-password)
+- [x] Tenant-side `audit_log` table
+- [x] Owner notification on grant open (shipped as SMS — ratify vs the email default in §7)
+
+Phase C
+- [x] `GET /v1/settings/audit` (owner reads their own trail — built early in Phase B)
+- [ ] Tenant `audit_log` **writes** across mutating modules (currently only the support flow writes)
+- [ ] `settings`: `GET|PATCH /business`
+- [ ] `settings`: `GET /sessions`, `DELETE /sessions/:id`
+- [ ] `settings`: `POST /export` (NDPR data export)
+
+Phase D
+- [ ] `tenant_feature_overrides` table + resolution in feature gate
+- [ ] `platform/analytics`: `GET /overview`, `/revenue`, `/usage`
+
+Unphased gap
+- [ ] `platform/users/` module: `GET /`, `POST /`, `PATCH /:id`, `DELETE /:id`, `POST /:id/reset-password`
+      — `platform_users:manage` exists but no way to manage platform staff via API
 
 ---
 
@@ -151,6 +207,12 @@ export const PLATFORM_PERMISSIONS: Record<PlatformRole, PlatformPermission[]>;
 | `admin` | above + `tenants:create`, `tenants:suspend`, `tenants:change_plan`, `platform_users:read` |
 | `super_admin` | everything, incl. `tenants:delete`, `tenants:override_features`, `platform_users:manage`, `billing:refund` |
 
+> Implementation note: the full permission enum above is shipped in
+> `src/config/platform-permissions.ts`, but `tenants:delete`, `tenants:override_features`,
+> `billing:read`, `billing:refund`, and `analytics:read` currently grant access to routes
+> that do not yet exist (Phase A carve-outs and Phases C/D). A permission with no route is
+> a promise the API does not keep — implement the route or drop the permission.
+
 ### Audit log
 
 Every platform-plane mutation writes exactly one row via an explicit
@@ -171,17 +233,17 @@ Follows the established 4-file convention (`controller.ts` / `service.ts` / `rou
 
 ```
 src/modules/platform/
-├── auth/       POST /login  /refresh  /logout  /mfa/setup  /mfa/verify   GET /me
+├── auth/       POST /login  /refresh  /logout  /mfa/setup  /mfa/verify   GET /me   [done]
 ├── tenants/    GET /  GET /:id  POST /
-│               PATCH /:id/suspend  /:id/reactivate  /:id/plan
-│               DELETE /:id        GET /:id/health
-├── users/      GET /  POST /  PATCH /:id  DELETE /:id  POST /:id/reset-password
-├── audit/      GET /  (filter: actor, action, tenantId, dateRange)   GET /:id
-├── support/    POST /grants  GET /grants  DELETE /grants/:id
+│               PATCH /:id/suspend  /:id/reactivate  /:id/plan            [done]
+│               DELETE /:id        GET /:id/health                        [not built]
+├── users/      GET /  POST /  PATCH /:id  DELETE /:id  POST /:id/reset-password  [not built]
+├── audit/      GET /  (filter: actor, action, tenantId, dateRange)   GET /:id  [done]
+├── support/    POST /grants  GET /grants  DELETE /grants/:id            [done]
 │               GET  /tenants/:id/orders | /payments | /subscription   (via grant)
 │               POST /tenants/:id/resend-receipt  /retry-webhook
 │                    /unlock-account  /reset-user-password
-└── analytics/  GET /overview  /revenue  /usage
+└── analytics/  GET /overview  /revenue  /usage                          [not built]
 ```
 
 All registered under `/v1/platform/*` in `src/app.ts`, all behind `requirePlatformAuth`.
@@ -189,15 +251,18 @@ All registered under `/v1/platform/*` in `src/app.ts`, all behind `requirePlatfo
 Owner-side (tenant plane) — one new module plus a new tenant table:
 
 ```
-src/modules/settings/   GET|PATCH /business
-                        GET /audit          — the owner's own activity trail
-                        GET /sessions   DELETE /sessions/:id
-                        POST /export        — NDPR data export
+src/modules/settings/   GET|PATCH /business                              [not built]
+                        GET /audit          — the owner's own activity trail  [done]
+                        GET /sessions   DELETE /sessions/:id              [not built]
+                        POST /export        — NDPR data export            [not built]
 ```
 
-Add `audit_log` to `src/shared/db/schema/tenant.ts` so owners see who did what inside
+`audit_log` exists in `src/shared/db/schema/tenant.ts` so owners see who did what inside
 their own business (`Chike voided order ORD-000123 at 14:02`), with support access
-appearing as a first-class entry.
+appearing as a first-class entry. **But today only the support flow writes to it** — the
+mutating merchant modules (orders, payments, ledger, …) do not yet emit audit entries, so
+the owner trail is empty except for support access. Wiring those writes is the first task
+of Phase C.
 
 ---
 
@@ -206,51 +271,64 @@ appearing as a first-class entry.
 1. **Close `POST /v1/tenants`.** Split the two legitimate callers: public self-signup
    moves behind `/v1/onboarding` with email verification and a strict rate limit;
    admin-initiated provisioning becomes `POST /v1/platform/tenants` gated on
-   `tenants:create`.
-2. **TOTP MFA required for `super_admin`**, optional for other roles. Use `otplib`; store
-   the secret through the existing `src/shared/crypto/encrypt.ts` (AES-256-GCM, already
-   built for logistics keys).
+   `tenants:create`. **Status:** partially done — admin provisioning shipped and public
+   signup is rate-limited to 3/hr, but email verification is still outstanding.
+2. **TOTP MFA required for `super_admin`** (shipped as required for `super_admin` and
+   `admin`), optional for other roles. Use `otplib`; store the secret through the existing
+   `src/shared/crypto/encrypt.ts` (AES-256-GCM, already built for logistics keys).
 3. **Separate rate-limit bucket** for `/v1/platform/*`, plus an optional IP allowlist via
    env.
 4. **Audit every failed platform login**, and never log a platform JWT.
 5. **Suspend, don't delete.** `tenants:delete` is super-admin-only and soft — it flips
    `isActive` and schedules schema drop after a retention window, so a mis-click is
-   recoverable and NDPR retention stays satisfiable.
+   recoverable and NDPR retention stays satisfiable. **Status:** not built — the
+   permission exists but there is no delete route or retention job.
 
 ---
 
 ## 5. Phasing (~20 hrs/week)
 
-### Phase A — Platform foundation (~2 weeks) ← start here
+### Phase A — Platform foundation (~2 weeks) — SHIPPED (2 carve-outs)
 Schema (4 tables + enum) and migrations · second JWT namespace · `platform/auth` with
 TOTP · `platform-auth.ts` middleware · `platform-permissions.ts` · audit write service ·
 `platform/tenants` (list, detail, suspend, reactivate, change plan) · close
 `POST /v1/tenants` · tests.
 
+Outstanding within A: email verification for public signup; the soft `tenants:delete` +
+retention window; `tenants:override_features`; `GET /:id/health`.
+
 **Exit:** a super-admin logs in with TOTP, lists every tenant, suspends one, and that
 tenant's users get 401 on their next request. Every action appears in
 `platform_audit_log`. A tenant token is rejected on `/v1/platform/*` and a platform token
-is rejected on `/v1/orders`.
+is rejected on `/v1/orders`. — MET.
 
-### Phase B — Support tooling (~1.5 weeks)
+### Phase B — Support tooling (~1.5 weeks) — SHIPPED
 `tenant_access_grants` + `requireTenantGrant` · support read endpoints reusing existing
 services · the four repair actions · tenant-side `audit_log` table · owner notification on
 grant open.
 
 **Exit:** support opens a 60-minute read grant with a stated reason, reads the merchant's
 orders, and the merchant sees the access in their own settings and gets notified. On
-expiry the same request returns 403.
+expiry the same request returns 403. — MET (notification ships over SMS, not email).
 
-### Phase C — Owner admin (~1.5 weeks)
+### Phase C — Owner admin (~1.5 weeks) — NOT STARTED
 Tenant `audit_log` writes across mutating modules · `settings` module · session listing and
 revocation · subscription/billing history · NDPR data export.
 
-### Phase D — Platform intelligence (~1 week)
+Priority-1 within C: wire `writeTenantAudit` into the mutating modules. Everything else in
+the owner trail depends on that data actually being recorded.
+
+### Phase D — Platform intelligence (~1 week) — NOT STARTED
 `tenant_feature_overrides` (grant one merchant a feature without changing their plan —
 also fixes the static-config limitation in `PLAN_ENTITLEMENTS`) · MRR, active tenants,
 churn, per-tenant usage.
 
-Total ≈ 6 weeks at 20 hrs/week.
+### Cross-cutting — Platform user management — NOT STARTED, unphased
+The `platform/users/` module. Without it there is no API path to create a second platform
+user; the only super-admin is one seeded directly into the database. Treat this as Phase A
+debt, not a Phase D nicety — it blocks onboarding any real support staff.
+
+Total ≈ 6 weeks at 20 hrs/week (A and B spent).
 
 ---
 
@@ -292,8 +370,8 @@ curl /v1/platform/audit?tenantId=... -H "Authorization: Bearer <platform_token>"
 ## 7. Open items
 
 - **Tenant retention window** before a suspended tenant's schema is dropped — needs an
-  NDPR call (suggest 90 days).
-- **Support access notification channel** — email via the existing Resend integration, SMS
-  via Termii, or both. Email is the assumed default.
+  NDPR call (suggest 90 days). Still open; blocks the soft `tenants:delete` in §4.5.
+- **Support access notification channel** — Phase B shipped **SMS** via Termii. The plan
+  originally assumed email via Resend as the default. Ratify SMS, or add email alongside.
 - **IP allowlist for `/v1/platform/*`** — worth it once support headcount exists; skip
   while the team is one person.

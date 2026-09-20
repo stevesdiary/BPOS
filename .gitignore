@@ -1,3 +1,10 @@
 node_modules
-
+dist
+tsconfig.tsbuildinfo
 .env
+.env.*
+!.env.example
+coverage
+*.local
+.DS_Store
+dump.rdb

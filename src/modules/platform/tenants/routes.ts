@@ -18,7 +18,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.get(
     '/',
     {
-      preHandler: platformGuard('tenants:read'),
+      onRequest: platformGuard('tenants:read'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'List all merchant tenants',
@@ -36,7 +36,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.get(
     '/:id',
     {
-      preHandler: platformGuard('tenants:read'),
+      onRequest: platformGuard('tenants:read'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'Get a single tenant record',
@@ -53,7 +53,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.post(
     '/',
     {
-      preHandler: platformGuard('tenants:create'),
+      onRequest: platformGuard('tenants:create'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'Provision a tenant on a merchant’s behalf',
@@ -75,7 +75,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.patch(
     '/:id/suspend',
     {
-      preHandler: platformGuard('tenants:suspend'),
+      onRequest: platformGuard('tenants:suspend'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'Suspend a tenant',
@@ -97,7 +97,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.patch(
     '/:id/reactivate',
     {
-      preHandler: platformGuard('tenants:suspend'),
+      onRequest: platformGuard('tenants:suspend'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'Reactivate a suspended tenant',
@@ -116,7 +116,7 @@ export default function platformTenantRoutes(app: FastifyInstance) {
   typed.patch(
     '/:id/plan',
     {
-      preHandler: platformGuard('tenants:change_plan'),
+      onRequest: platformGuard('tenants:change_plan'),
       schema: {
         tags: ['Platform · Tenants'],
         summary: 'Change a tenant’s plan tier',

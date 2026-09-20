@@ -77,7 +77,7 @@ export async function requirePlatformAuth(
 }
 
 /**
- * Returns a preHandler enforcing a single platform permission.
+ * Returns a hook enforcing a single platform permission.
  * Mirrors requireFeature() in feature-gate.ts, but reads from
  * PLATFORM_PERMISSIONS — internal trust is never derived from a merchant's plan.
  *
@@ -103,6 +103,12 @@ type PlatformAuthUserMaybe = { role: PlatformRole } | undefined;
 
 /**
  * Convenience chain for a platform route: authenticate, then authorise.
+ *
+ * Register this as `onRequest`, not `preHandler`. Fastify validates the body
+ * and querystring between the two, so a preHandler guard lets an unauthorised
+ * caller probe the request schema by reading the 400 it gets back before the
+ * 401/403 it should have got. Neither guard touches the body, so running them
+ * earlier costs nothing.
  */
 export function platformGuard(permission: PlatformPermission) {
   return [requirePlatformAuth, requirePlatformPermission(permission)];

@@ -18,7 +18,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.get(
     '/',
     {
-      preHandler: platformGuard('platform_users:read'),
+      onRequest: platformGuard('platform_users:read'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'List platform staff accounts',
@@ -36,7 +36,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.get(
     '/:id',
     {
-      preHandler: platformGuard('platform_users:read'),
+      onRequest: platformGuard('platform_users:read'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'Get a single platform staff account',
@@ -53,7 +53,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.post(
     '/',
     {
-      preHandler: platformGuard('platform_users:manage'),
+      onRequest: platformGuard('platform_users:manage'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'Create a platform staff account',
@@ -75,7 +75,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.patch(
     '/:id',
     {
-      preHandler: platformGuard('platform_users:manage'),
+      onRequest: platformGuard('platform_users:manage'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'Update a platform staff account',
@@ -99,7 +99,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.delete(
     '/:id',
     {
-      preHandler: platformGuard('platform_users:manage'),
+      onRequest: platformGuard('platform_users:manage'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'Deactivate a platform staff account',
@@ -121,7 +121,7 @@ export default function platformUserRoutes(app: FastifyInstance) {
   typed.post(
     '/:id/reset-password',
     {
-      preHandler: platformGuard('platform_users:manage'),
+      onRequest: platformGuard('platform_users:manage'),
       schema: {
         tags: ['Platform · Users'],
         summary: 'Reset a platform staff password',

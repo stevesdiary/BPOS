@@ -275,6 +275,68 @@ describe('mandatory audit reason', () => {
   });
 });
 
+// ─── Authorisation precedes validation ────────────────────────────────────────
+//
+// The guards run as onRequest, which is before Fastify validates the body.
+// If they slip back to preHandler these tests fail: an unauthorised caller
+// would get a 400 describing the schema instead of the 401/403 it is owed.
+
+describe('authorisation runs before body validation', () => {
+  it('answers 401, not 400, for an unauthenticated request with a bad body', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/v1/platform/tenants',
+      payload: { nonsense: true },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('answers 401, not 400, for a tenant-plane token with a bad body', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/v1/platform/tenants/tenant-abc/plan',
+      headers: { authorization: `Bearer ${tenantToken}` },
+      payload: { planTier: 'not-a-tier' },
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('answers 403, not 400, when the role lacks the permission', async () => {
+    state.platformUser = { ...platformUserRow, role: 'read_only' };
+    const readOnlyToken = signPlatformToken(
+      app,
+      {
+        sub: platformUserRow.id,
+        role: 'read_only',
+        email: platformUserRow.email,
+        aud: 'platform',
+        type: 'access',
+      },
+      '15m',
+    );
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/v1/platform/tenants/tenant-abc/suspend',
+      headers: { authorization: `Bearer ${readOnlyToken}` },
+      payload: {},
+    });
+
+    state.platformUser = { ...platformUserRow };
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('still validates the body once the caller is authorised', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/v1/platform/tenants/tenant-abc/plan',
+      headers: { authorization: `Bearer ${platformToken}` },
+      payload: { planTier: 'not-a-tier', reason: 'Merchant asked to upgrade on a call' },
+    });
+    expect(res.statusCode).toBe(400);
+  });
+});
+
 // ─── Public tenant signup ─────────────────────────────────────────────────────
 
 describe('POST /v1/tenants (public signup)', () => {

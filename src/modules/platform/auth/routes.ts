@@ -86,7 +86,7 @@ export default function platformAuthRoutes(app: FastifyInstance) {
   typed.post(
     '/logout',
     {
-      preHandler: [requirePlatformAuth],
+      onRequest: [requirePlatformAuth],
       schema: {
         tags: ['Platform · Auth'],
         summary: 'Revoke the current platform session',
@@ -103,7 +103,7 @@ export default function platformAuthRoutes(app: FastifyInstance) {
   typed.get(
     '/me',
     {
-      preHandler: [requirePlatformAuth],
+      onRequest: [requirePlatformAuth],
       schema: {
         tags: ['Platform · Auth'],
         summary: 'Get the authenticated platform user',
@@ -124,7 +124,7 @@ export default function platformAuthRoutes(app: FastifyInstance) {
   typed.post(
     '/mfa/setup',
     {
-      preHandler: [requirePlatformAuth],
+      onRequest: [requirePlatformAuth],
       config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
       schema: {
         tags: ['Platform · Auth'],
@@ -144,7 +144,7 @@ export default function platformAuthRoutes(app: FastifyInstance) {
   typed.post(
     '/mfa/verify',
     {
-      preHandler: [requirePlatformAuth],
+      onRequest: [requirePlatformAuth],
       config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
       schema: {
         tags: ['Platform · Auth'],

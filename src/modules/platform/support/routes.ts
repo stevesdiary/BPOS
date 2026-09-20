@@ -27,6 +27,11 @@ import {
  *   requireTenantGrant           — do you have live, reasoned access to THIS tenant
  *
  * All three must pass. Holding a support role is never sufficient on its own.
+ *
+ * The first two run as onRequest so identity and permission are settled before
+ * Fastify validates the body — otherwise an unauthorised caller learns the
+ * schema from a 400. The grant check stays in preHandler because it resolves
+ * the tenant from the route params.
  */
 export default function platformSupportRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -36,7 +41,7 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.post(
     '/grants',
     {
-      preHandler: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Open a time-boxed access grant on a tenant',
@@ -57,7 +62,7 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.get(
     '/grants',
     {
-      preHandler: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'List access grants',
@@ -75,7 +80,7 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.delete(
     '/grants/:id',
     {
-      preHandler: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Revoke an access grant early',
@@ -95,11 +100,8 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.get(
     '/tenants/:tenantId/orders',
     {
-      preHandler: [
-        requirePlatformAuth,
-        requirePlatformPermission('support:grant_read'),
-        requireTenantGrant('read'),
-      ],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:grant_read')],
+      preHandler: [requireTenantGrant('read')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Read a tenant’s orders under an active grant',
@@ -127,11 +129,8 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.post(
     '/tenants/:tenantId/resend-receipt',
     {
-      preHandler: [
-        requirePlatformAuth,
-        requirePlatformPermission('support:resend_receipt'),
-        requireTenantGrant('write'),
-      ],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:resend_receipt')],
+      preHandler: [requireTenantGrant('write')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Re-generate and re-send an invoice to the customer',
@@ -155,11 +154,8 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.post(
     '/tenants/:tenantId/retry-webhook',
     {
-      preHandler: [
-        requirePlatformAuth,
-        requirePlatformPermission('support:retry_webhook'),
-        requireTenantGrant('write'),
-      ],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:retry_webhook')],
+      preHandler: [requireTenantGrant('write')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Re-process a payment webhook from its raw payload',
@@ -186,11 +182,8 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.post(
     '/tenants/:tenantId/unlock-account',
     {
-      preHandler: [
-        requirePlatformAuth,
-        requirePlatformPermission('support:unlock_account'),
-        requireTenantGrant('write'),
-      ],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:unlock_account')],
+      preHandler: [requireTenantGrant('write')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Reactivate a deactivated merchant user',
@@ -215,11 +208,8 @@ export default function platformSupportRoutes(app: FastifyInstance) {
   typed.post(
     '/tenants/:tenantId/reset-password',
     {
-      preHandler: [
-        requirePlatformAuth,
-        requirePlatformPermission('support:reset_password'),
-        requireTenantGrant('write'),
-      ],
+      onRequest: [requirePlatformAuth, requirePlatformPermission('support:reset_password')],
+      preHandler: [requireTenantGrant('write')],
       schema: {
         tags: ['Platform · Support'],
         summary: 'Trigger the standard password-reset email for a merchant user',

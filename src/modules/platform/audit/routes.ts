@@ -25,7 +25,7 @@ export default function platformAuditRoutes(app: FastifyInstance) {
   typed.get(
     '/',
     {
-      preHandler: platformGuard('audit:read'),
+      onRequest: platformGuard('audit:read'),
       schema: {
         tags: ['Platform · Audit'],
         summary: 'Query the platform audit log',

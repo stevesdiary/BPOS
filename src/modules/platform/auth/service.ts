@@ -88,7 +88,7 @@ export async function loginPlatformUser(
     if (!totpCode) {
       throw new UnauthorizedError('MFA code required');
     }
-    if (!(await verifyTotp(user.mfaSecretEncrypted, totpCode))) {
+    if (!(await verifyTotp(user.mfaSecretEncrypted, totpCode, user.id))) {
       throw new UnauthorizedError('Invalid MFA code');
     }
   }
@@ -235,7 +235,7 @@ export async function confirmMfaEnrolment(
   }
 
   const secret = decrypt(user.mfaSecretEncrypted);
-  if (!(await verifyTotpPlain(secret, code))) {
+  if (!(await verifyTotpPlain(secret, code, user.id))) {
     throw new UnauthorizedError('Invalid MFA code');
   }
 

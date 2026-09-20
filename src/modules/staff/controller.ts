@@ -1,5 +1,6 @@
 import type { RequestContext } from '../../shared/types/controller.js';
 import type { UserRole } from '../../shared/types/index.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import {
   listStaff,
   getStaffMember,
@@ -28,7 +29,14 @@ export async function invite(
     temporaryPassword: string;
   },
 ) {
-  return inviteStaff(ctx.schema, input);
+  const member = await inviteStaff(ctx.schema, input);
+  await auditUserAction(ctx, {
+    action: 'staff.invited',
+    targetType: 'staff',
+    targetId: member.id,
+    metadata: { email: input.email, role: input.role },
+  });
+  return member;
 }
 
 export async function update(
@@ -43,9 +51,19 @@ export async function update(
     isActive: boolean;
   }>,
 ) {
-  return updateStaffMember(ctx.schema, id, input);
+  const member = await updateStaffMember(ctx.schema, id, input);
+  await auditUserAction(ctx, {
+    action: 'staff.updated',
+    targetType: 'staff',
+    targetId: id,
+    // Role changes are the security-sensitive case; surface the new value.
+    metadata: { fields: Object.keys(input), ...(input.role !== undefined && { role: input.role }) },
+  });
+  return member;
 }
 
 export async function deactivate(ctx: RequestContext, id: string) {
-  return deactivateStaffMember(ctx.schema, id, ctx.userId);
+  const result = await deactivateStaffMember(ctx.schema, id, ctx.userId);
+  await auditUserAction(ctx, { action: 'staff.deactivated', targetType: 'staff', targetId: id });
+  return result;
 }

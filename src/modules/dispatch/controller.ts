@@ -73,7 +73,7 @@ export async function handleWebhook(
   tenantId: string,
   payload: LogisticsWebhookPayload,
 ) {
-  if (!payload.metadata) payload.metadata = {};
-  if (!payload.metadata.tenantId) payload.metadata.tenantId = tenantId;
+  payload.metadata ??= {};
+  payload.metadata.tenantId ??= tenantId;
   return handleLogisticsWebhook(rawBody, signature, provider, payload);
 }

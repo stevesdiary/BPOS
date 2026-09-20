@@ -3,6 +3,7 @@
  */
 
 import type { RequestContext } from '../../shared/types/controller.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import type { CreateOrderInput } from './service.js';
 import {
   createOrder,
@@ -35,7 +36,14 @@ function parseOrderQuery(raw: OrderListQuery) {
 }
 
 export async function create(ctx: RequestContext, input: CreateOrderInput) {
-  return createOrder(ctx.schema, ctx.userId, input);
+  const order = await createOrder(ctx.schema, ctx.userId, input);
+  await auditUserAction(ctx, {
+    action: 'order.created',
+    targetType: 'order',
+    targetId: order.id,
+    metadata: { orderNumber: order.orderNumber, channel: order.channel },
+  });
+  return order;
 }
 
 export async function list(ctx: RequestContext, query: OrderListQuery) {
@@ -47,17 +55,29 @@ export async function get(ctx: RequestContext, orderId: string) {
 }
 
 export async function confirm(ctx: RequestContext, orderId: string) {
-  return confirmOrder(ctx.schema, ctx.tenantId, orderId, ctx.userId);
+  const order = await confirmOrder(ctx.schema, ctx.tenantId, orderId, ctx.userId);
+  await auditUserAction(ctx, { action: 'order.confirmed', targetType: 'order', targetId: orderId });
+  return order;
 }
 
 export async function process(ctx: RequestContext, orderId: string) {
-  return processOrder(ctx.schema, orderId);
+  const order = await processOrder(ctx.schema, orderId);
+  await auditUserAction(ctx, {
+    action: 'order.processing',
+    targetType: 'order',
+    targetId: orderId,
+  });
+  return order;
 }
 
 export async function fulfil(ctx: RequestContext, orderId: string) {
-  return fulfillOrder(ctx.schema, orderId);
+  const order = await fulfillOrder(ctx.schema, orderId);
+  await auditUserAction(ctx, { action: 'order.fulfilled', targetType: 'order', targetId: orderId });
+  return order;
 }
 
 export async function cancel(ctx: RequestContext, orderId: string) {
-  return cancelOrder(ctx.schema, orderId, ctx.userId);
+  const order = await cancelOrder(ctx.schema, orderId, ctx.userId);
+  await auditUserAction(ctx, { action: 'order.cancelled', targetType: 'order', targetId: orderId });
+  return order;
 }

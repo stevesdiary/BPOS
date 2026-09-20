@@ -1,4 +1,5 @@
 import type { RequestContext } from '../../shared/types/controller.js';
+import { auditUserAction } from '../../shared/audit/tenant-audit.js';
 import { createExpense, listExpenses, getExpense } from './service.js';
 
 export async function create(
@@ -12,7 +13,14 @@ export async function create(
     receiptUrl?: string;
   },
 ) {
-  return createExpense(ctx.schema, ctx.userId, input);
+  const expense = await createExpense(ctx.schema, ctx.userId, input);
+  await auditUserAction(ctx, {
+    action: 'expense.created',
+    targetType: 'expense',
+    targetId: expense.id,
+    metadata: { amountKobo: input.amountKobo, category: input.category },
+  });
+  return expense;
 }
 
 export async function list(

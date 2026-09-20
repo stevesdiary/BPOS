@@ -5,19 +5,23 @@ export const listInventoryQuerySchema = z.object({
   variantId: z.string().optional(),
 });
 
-export const receiveStockBodySchema = z.object({
-  variantId: z.string(),
-  locationId: z.string(),
-  quantity: z.number().int().min(1),
-  note: z.string().optional(),
-}).strict();
+export const receiveStockBodySchema = z
+  .object({
+    variantId: z.string(),
+    locationId: z.string(),
+    quantity: z.number().int().min(1),
+    note: z.string().optional(),
+  })
+  .strict();
 
-export const adjustStockBodySchema = z.object({
-  variantId: z.string(),
-  locationId: z.string(),
-  quantity: z.number().int(),
-  note: z.string().optional(),
-}).strict();
+export const adjustStockBodySchema = z
+  .object({
+    variantId: z.string(),
+    locationId: z.string(),
+    quantity: z.number().int(),
+    note: z.string().optional(),
+  })
+  .strict();
 
 export const movementsQuerySchema = z.object({
   variantId: z.string().optional(),

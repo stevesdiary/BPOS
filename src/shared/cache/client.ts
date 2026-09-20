@@ -29,7 +29,7 @@ export async function cacheDel(key: string): Promise<void> {
 }
 
 export async function cacheDelPattern(pattern: string): Promise<void> {
-  const stream = cache.scanStream({ match: pattern, count: 100 });
+  const stream = cache.scanStream({ match: pattern, count: 100 }) as AsyncIterable<string[]>;
   for await (const keys of stream) {
     if (keys.length > 0) {
       await cache.del(...keys);

@@ -4,7 +4,6 @@
  */
 
 import type { FastifyInstance } from 'fastify';
-import { NotFoundError } from '../../shared/errors/types.js';
 import {
   loginUser,
   refreshAccessToken,
@@ -32,7 +31,12 @@ export interface RefreshInput {
 
 export async function refresh(app: FastifyInstance, input: RefreshInput) {
   const tenant = await resolveTenantFromSlug(input.tenantSlug);
-  const accessToken = await refreshAccessToken(app, tenant.id, tenant.schemaName, input.refreshToken);
+  const accessToken = await refreshAccessToken(
+    app,
+    tenant.id,
+    tenant.schemaName,
+    input.refreshToken,
+  );
   return { accessToken };
 }
 

@@ -111,11 +111,7 @@ export async function listProducts(
 
 export async function getProduct(schemaName: string, productId: string) {
   return withTenantSchema(schemaName, async (db) => {
-    const [product] = await db
-      .select()
-      .from(products)
-      .where(eq(products.id, productId))
-      .limit(1);
+    const [product] = await db.select().from(products).where(eq(products.id, productId)).limit(1);
     if (!product) throw new NotFoundError('Product', productId);
 
     const variants = await db
@@ -247,9 +243,7 @@ export async function updateVariant(
     const [existing] = await db
       .select({ id: productVariants.id })
       .from(productVariants)
-      .where(
-        and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)),
-      )
+      .where(and(eq(productVariants.id, variantId), eq(productVariants.productId, productId)))
       .limit(1);
     if (!existing) throw new NotFoundError('Variant', variantId);
 

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle as drizzleNeon, type NeonDatabase } from 'drizzle-orm/neon-serverless';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
@@ -22,6 +23,9 @@ neonConfig.webSocketConstructor = ws;
 
 let _tenantDb: TenantDb | null = null;
 
+// The transaction of the withTenantSchema call currently running, if any.
+const activeTenantTx = new AsyncLocalStorage<{ schemaName: string; tx: TenantDb }>();
+
 function getTenantDb(): TenantDb {
   if (!_tenantDb) {
     if (isNeonUrl(env.DATABASE_URL)) {
@@ -44,6 +48,12 @@ function getTenantDb(): TenantDb {
  *
  * The callback runs inside one transaction on one connection: every query in
  * it sees the tenant schema, and a thrown error rolls back its writes.
+ *
+ * A call nested inside another for the same schema (e.g. posting journal
+ * entries while confirming a payment) runs as a savepoint of the outer
+ * transaction. It sees the outer, uncommitted writes, needs no second pooled
+ * connection, and if it fails only its own statements roll back, so callers
+ * can still .catch() a non-fatal nested failure and carry on.
  */
 export async function withTenantSchema<T>(
   schemaName: string,
@@ -52,9 +62,15 @@ export async function withTenantSchema<T>(
   if (!validateSchemaName(schemaName)) {
     throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
   }
+  const outer = activeTenantTx.getStore();
+  if (outer?.schemaName === schemaName) {
+    return outer.tx.transaction((savepoint) =>
+      activeTenantTx.run({ schemaName, tx: savepoint }, () => callback(savepoint)),
+    );
+  }
   return getTenantDb().transaction(async (tx) => {
     await tx.execute(sql.raw(`SET LOCAL search_path TO "${schemaName}", public`));
-    return callback(tx);
+    return activeTenantTx.run({ schemaName, tx }, () => callback(tx));
   });
 }
 

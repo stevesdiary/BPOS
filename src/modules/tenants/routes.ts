@@ -2,7 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from '@fastify/type-provider-zod';
 import { sendCreated } from '../../shared/http/response.js';
 import * as controller from './controller.js';
-import { createTenantBodySchema } from './validators.js';
+import { createTenantBodySchema, createTenantResponseSchema } from './validators.js';
+import { errorEnvelopeSchema } from '../../shared/http/schemas.js';
 
 export default function tenantRoutes(app: FastifyInstance) {
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -29,6 +30,12 @@ export default function tenantRoutes(app: FastifyInstance) {
           'account. Rate limited to 3 per hour per IP.',
         security: [],
         body: createTenantBodySchema,
+        response: {
+          201: createTenantResponseSchema,
+          400: errorEnvelopeSchema,
+          409: errorEnvelopeSchema,
+          429: errorEnvelopeSchema,
+        },
       },
     },
     async (request, reply) => {

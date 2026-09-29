@@ -6,14 +6,16 @@
  *   1. Start the dev server: npm run dev
  *   2. In another terminal: npm run docs:export
  *
- * Requires PLATFORM_BASE_URL to be set in .env (defaults to http://localhost:3000).
+ * Reads the local server at http://localhost:$PORT (PORT from .env). Set
+ * OPENAPI_SOURCE_URL to export from another running instance instead.
  * Output: docs/openapi.json
  */
 
+import 'dotenv/config';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const BASE_URL = process.env.PLATFORM_BASE_URL || 'http://localhost:3000';
+const BASE_URL = process.env.OPENAPI_SOURCE_URL || `http://localhost:${process.env.PORT || '3000'}`;
 const OUTPUT_DIR = resolve(process.cwd(), 'docs');
 const OUTPUT_FILE = resolve(OUTPUT_DIR, 'openapi.json');
 

@@ -32,12 +32,24 @@ export interface MigrationSession {
   close(): Promise<void>;
 }
 
+/**
+ * Neon's pooled host (ep-xxx-pooler) shares server connections between
+ * clients. The session-level SET search_path a tenant migration needs would
+ * stay on a shared connection and redirect other clients' unqualified queries
+ * into that tenant's schema. Migrations therefore use the direct host.
+ */
+export function directNeonUrl(url: string): string {
+  const parsed = new URL(url);
+  parsed.hostname = parsed.hostname.replace('-pooler.', '.');
+  return parsed.toString();
+}
+
 export async function createMigrationSession(): Promise<MigrationSession> {
   if (isNeonUrl(env.DATABASE_URL)) {
     // One WebSocket client, not the HTTP driver: the HTTP driver is stateless
     // per statement, so a SET search_path would not reach the migration.
     neonConfig.webSocketConstructor = ws;
-    const client = new Client(env.DATABASE_URL);
+    const client = new Client(directNeonUrl(env.DATABASE_URL));
     await client.connect();
     const db = drizzleNeon(client);
     return {

@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
+    "db:generate:tenant": "drizzle-kit generate --config drizzle.tenant.config.ts && tsx scripts/unqualify-tenant-migrations.ts",
     "db:migrate": "tsx src/shared/db/migrate.ts",
     "db:migrate:tenant": "tsx src/shared/db/migrate-tenant.ts",
     "db:seed:dev": "tsx db/seed/dev.ts",
@@ -54,12 +55,14 @@
     "resend": "^6.16.0",
     "sharp": "^0.35.3",
     "uuid": "^10.0.0",
+    "ws": "^8.22.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.7.0",
     "@types/node": "^20.14.11",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "^2.0.4",
     "drizzle-kit": "^0.22.8",
     "eslint": "^9.7.0",

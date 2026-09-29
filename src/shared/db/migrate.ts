@@ -10,7 +10,7 @@ import { createMigrationSession } from './migration-client.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_MIGRATIONS_PATH = path.resolve(__dirname, '../../../db/migrations/public');
 
-const session = createMigrationSession();
+const session = await createMigrationSession();
 try {
   await session.migrate(PUBLIC_MIGRATIONS_PATH);
   console.log('Public schema migrations completed');

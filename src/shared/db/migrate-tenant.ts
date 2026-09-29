@@ -24,11 +24,11 @@ export async function runTenantMigrations(schemaName: string): Promise<void> {
     throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
   }
 
-  const session = createMigrationSession();
+  const session = await createMigrationSession();
   try {
     // Set search_path to target schema before running migrations
     await session.execute(`SET search_path TO "${schemaName}"`);
-    await session.migrate(TENANT_MIGRATIONS_PATH);
+    await session.migrate(TENANT_MIGRATIONS_PATH, schemaName);
   } finally {
     await session.close();
   }

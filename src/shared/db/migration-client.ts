@@ -8,9 +8,10 @@
  * bring their database up at all.
  */
 
-import { neon } from '@neondatabase/serverless';
-import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
-import { migrate as migrateNeon } from 'drizzle-orm/neon-http/migrator';
+import { Client, neonConfig } from '@neondatabase/serverless';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
+import { migrate as migrateNeon } from 'drizzle-orm/neon-serverless/migrator';
+import ws from 'ws';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
@@ -21,21 +22,33 @@ import { isNeonUrl } from './client.js';
 export interface MigrationSession {
   /** Run a raw statement before migrating — e.g. setting search_path. */
   execute(statement: string): Promise<void>;
-  migrate(migrationsFolder: string): Promise<void>;
+  /**
+   * migrationsSchema: where drizzle records applied migrations. Tenant
+   * migrations must pass the tenant schema, or every tenant after the first
+   * finds them "already applied" in the shared record and gets no tables.
+   */
+  migrate(migrationsFolder: string, migrationsSchema?: string): Promise<void>;
   /** Releases the connection. A postgres-js script hangs without it. */
   close(): Promise<void>;
 }
 
-export function createMigrationSession(): MigrationSession {
+export async function createMigrationSession(): Promise<MigrationSession> {
   if (isNeonUrl(env.DATABASE_URL)) {
-    const db = drizzleNeon(neon(env.DATABASE_URL));
+    // One WebSocket client, not the HTTP driver: the HTTP driver is stateless
+    // per statement, so a SET search_path would not reach the migration.
+    neonConfig.webSocketConstructor = ws;
+    const client = new Client(env.DATABASE_URL);
+    await client.connect();
+    const db = drizzleNeon(client);
     return {
       execute: async (statement) => {
         await db.execute(sql.raw(statement));
       },
-      migrate: (migrationsFolder) => migrateNeon(db, { migrationsFolder }),
-      // HTTP transport — nothing to release.
-      close: async () => undefined,
+      migrate: (migrationsFolder, migrationsSchema) =>
+        migrateNeon(db, { migrationsFolder, ...(migrationsSchema ? { migrationsSchema } : {}) }),
+      close: async () => {
+        await client.end();
+      },
     };
   }
 
@@ -50,7 +63,8 @@ export function createMigrationSession(): MigrationSession {
     execute: async (statement) => {
       await db.execute(sql.raw(statement));
     },
-    migrate: (migrationsFolder) => migratePostgres(db, { migrationsFolder }),
+    migrate: (migrationsFolder, migrationsSchema) =>
+      migratePostgres(db, { migrationsFolder, ...(migrationsSchema ? { migrationsSchema } : {}) }),
     close: async () => {
       await client.end();
     },

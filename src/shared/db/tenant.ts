@@ -1,24 +1,49 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle, type NeonHttpDatabase } from 'drizzle-orm/neon-http';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle as drizzleNeon, type NeonDatabase } from 'drizzle-orm/neon-serverless';
+import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import ws from 'ws';
 import { sql } from 'drizzle-orm';
 import { env } from '../../config/env.js';
 import * as tenantSchema from './schema/tenant.js';
+import { isNeonUrl } from './client.js';
 import { ValidationError } from '../errors/types.js';
 
-export type TenantDb = NeonHttpDatabase<typeof tenantSchema>;
+export type TenantDb = NeonDatabase<typeof tenantSchema>;
 
-function createTenantDb(): TenantDb {
-  const sqlClient = neon(env.DATABASE_URL);
-  return drizzle(sqlClient, { schema: tenantSchema });
+// Tenant queries depend on search_path, which is session state. Neon's HTTP
+// driver runs every statement as its own request, so a SET search_path is
+// gone by the next query and everything silently falls through to public.
+// Tenant access therefore uses Neon's WebSocket Pool (a real session) and
+// runs each callback in a transaction with SET LOCAL, which also keeps the
+// setting from leaking to the next user of the pooled connection.
+// Node 20 has no global WebSocket, so hand the driver the ws implementation.
+neonConfig.webSocketConstructor = ws;
+
+let _tenantDb: TenantDb | null = null;
+
+function getTenantDb(): TenantDb {
+  if (!_tenantDb) {
+    if (isNeonUrl(env.DATABASE_URL)) {
+      _tenantDb = drizzleNeon(new Pool({ connectionString: env.DATABASE_URL }), {
+        schema: tenantSchema,
+      });
+    } else {
+      // Standard PostgreSQL (local/CI). Same query surface; see client.ts.
+      _tenantDb = drizzlePostgres(postgres(env.DATABASE_URL), {
+        schema: tenantSchema,
+      }) as unknown as TenantDb;
+    }
+  }
+  return _tenantDb;
 }
 
 /**
  * Executes a callback with the search_path set to the tenant schema.
  * Use this for all tenant-scoped database operations.
  *
- * The Neon HTTP transport is stateless per-request. search_path is set
- * via a raw SQL statement before the callback runs, scoping all queries
- * within the callback to the correct tenant schema.
+ * The callback runs inside one transaction on one connection: every query in
+ * it sees the tenant schema, and a thrown error rolls back its writes.
  */
 export async function withTenantSchema<T>(
   schemaName: string,
@@ -27,9 +52,10 @@ export async function withTenantSchema<T>(
   if (!validateSchemaName(schemaName)) {
     throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
   }
-  const tenantDb = createTenantDb();
-  await tenantDb.execute(sql.raw(`SET search_path TO "${schemaName}", public`));
-  return callback(tenantDb);
+  return getTenantDb().transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL search_path TO "${schemaName}", public`));
+    return callback(tx);
+  });
 }
 
 /**
@@ -40,7 +66,7 @@ export async function provisionTenantSchema(schemaName: string): Promise<void> {
   if (!validateSchemaName(schemaName)) {
     throw new ValidationError(`Invalid tenant schema name: "${schemaName}"`);
   }
-  const tenantDb = createTenantDb();
+  const tenantDb = getTenantDb();
   await tenantDb.execute(sql.raw(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`));
   // Create the order_number_seq in the new schema for atomic order number generation.
   await tenantDb.execute(sql.raw(`CREATE SEQUENCE IF NOT EXISTS "${schemaName}".order_number_seq`));

@@ -144,7 +144,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"businessName\": \"Adaeze Beauty Store\",\n  \"ownerEmail\": \"adaeze@example.com\",\n  \"ownerPassword\": \"securePassword123\",\n  \"ownerFirstName\": \"Adaeze\",\n  "ownerLastName\": \"Okoro\"\n}"
+              "raw": "{\n  \"businessName\": \"Adaeze Beauty Store\",\n  \"ownerEmail\": \"adaeze@example.com\",\n  \"ownerPassword\": \"securePassword123\",\n  \"ownerFirstName\": \"Adaeze\",\n  \"ownerLastName\": \"Okoro\"\n}"
             },
             "description": "Provision a new merchant tenant. Creates the tenant schema, owner user, and starter plan subscription. Unauthenticated."
           },

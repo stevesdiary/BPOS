@@ -3185,6 +3185,7 @@
                     "type": "string"
                   },
                   "receiptUrl": {
+                    "description": "The `ref` from POST /v1/uploads/image?visibility=private (or an external URL). Responses return a signed link valid for 1 hour.",
                     "type": "string"
                   }
                 },
@@ -3966,7 +3967,22 @@
         "tags": [
           "Uploads"
         ],
-        "description": "Accepts a single multipart image file (jpeg/png/webp), compresses it, and returns a public URL to attach to other resources (e.g. imageUrl, receiptUrl).",
+        "description": "Accepts a single multipart image file (jpeg/png/webp) and compresses it.\n\n- `visibility=public` (default): stored on Cloudflare R2. Returns a permanent `url`; use it for product images.\n- `visibility=private`: stored privately (R2 private bucket or Neon, per `PRIVATE_STORAGE_PROVIDER`). Returns `ref` (`r2://…` or `neon://…`) and a signed `url` valid for 1 hour. Store `ref` (e.g. as an expense `receiptUrl`); reading that resource later returns a fresh signed link.",
+        "parameters": [
+          {
+            "schema": {
+              "default": "public",
+              "type": "string",
+              "enum": [
+                "public",
+                "private"
+              ]
+            },
+            "in": "query",
+            "name": "visibility",
+            "required": false
+          }
+        ],
         "security": [
           {
             "bearerAuth": []

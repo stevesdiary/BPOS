@@ -36,6 +36,20 @@ const envSchema = z.object({
   R2_SECRET_ACCESS_KEY: z.string(),
   R2_BUCKET_NAME: z.string(),
   R2_PUBLIC_URL: z.string().url(),
+  // Bucket for private files when PRIVATE_STORAGE_PROVIDER=r2. Give it no
+  // public access or custom domain. Falls back to R2_BUCKET_NAME if unset.
+  R2_PRIVATE_BUCKET_NAME: z.string().optional(),
+
+  // Where private files (invoice PDFs, expense receipts) are stored.
+  PRIVATE_STORAGE_PROVIDER: z.enum(['r2', 'neon']).default('r2'),
+
+  // Neon object storage (S3-compatible) — private files. Optional so the app
+  // boots without it; uploads that need it fail with a 502 until it is set.
+  AWS_ENDPOINT_URL_S3: z.string().url().optional(),
+  AWS_ACCESS_KEY_ID: z.string().optional(),
+  AWS_SECRET_ACCESS_KEY: z.string().optional(),
+  AWS_REGION: z.string().default('us-east-2'),
+  NEON_STORAGE_BUCKET: z.string().default('assets'),
 
   // Paystack
   PAYSTACK_SECRET_KEY: z.string(),

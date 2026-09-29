@@ -15,7 +15,13 @@ export const createExpenseBodySchema = z
     ]),
     expenseDate: z.string().datetime(),
     locationId: z.string().optional(),
-    receiptUrl: z.string().optional(),
+    receiptUrl: z
+      .string()
+      .optional()
+      .describe(
+        'The `ref` from POST /v1/uploads/image?visibility=private (or an external URL). ' +
+          'Responses return a signed link valid for 1 hour.',
+      ),
   })
   .strict();
 

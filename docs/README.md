@@ -106,6 +106,19 @@ Merchant list endpoints (orders, products, customers, inventory, expenses, ledge
 
 Platform (admin) list endpoints nest the counts: `data: { items, pagination: { page, limit, total, totalPages } }`.
 
+### File Storage
+
+| Files | Where | Stored value | Returned to clients |
+|-------|-------|--------------|---------------------|
+| Product photos | Cloudflare R2, public bucket (`R2_BUCKET_NAME`) | public URL | the same URL |
+| Invoice PDFs, expense receipts | private storage, chosen by `PRIVATE_STORAGE_PROVIDER` | `r2://<key>` or `neon://<key>` | a signed link valid for 1 hour, fresh on every read |
+
+- `PRIVATE_STORAGE_PROVIDER=r2` (default) keeps everything on Cloudflare, in `R2_PRIVATE_BUCKET_NAME`. Give that bucket no public access or custom domain. If it is unset, private files fall back to `R2_BUCKET_NAME`, where anyone with the key could read them through the public domain.
+- `PRIVATE_STORAGE_PROVIDER=neon` uses Neon object storage (`AWS_ENDPOINT_URL_S3`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `NEON_STORAGE_BUCKET`).
+- Stored references name their provider, so switching only affects new files. Old files still resolve while the old provider's credentials stay configured.
+- Upload a receipt with `POST /v1/uploads/image?visibility=private` and save the returned `ref` as the expense's `receiptUrl`.
+- Object keys start with the tenant schema name, and a reference is only signed for its own tenant.
+
 ### Monetary Values
 
 All monetary values are stored and returned as **integer kobo** (₦1 = 100 kobo).

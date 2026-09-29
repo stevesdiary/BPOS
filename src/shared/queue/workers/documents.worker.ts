@@ -13,7 +13,7 @@ import {
   invoices,
 } from '../../db/schema/tenant.js';
 import { renderInvoicePdf } from '../../pdf/invoice.js';
-import { uploadToR2 } from '../../storage/r2.js';
+import { uploadPrivate } from '../../storage/private.js';
 import { sendInvoiceEmail } from '../../email/index.js';
 
 createWorker<GenerateInvoiceJobData>(QUEUES.DOCUMENTS, async (job) => {
@@ -109,13 +109,18 @@ createWorker<GenerateInvoiceJobData>(QUEUES.DOCUMENTS, async (job) => {
     orderChannel: order.channel,
   });
 
-  // ── 4. Upload to R2 ───────────────────────────────────────────────────────────
-  const r2Key = `invoices/${tenantId}/${invoiceId}.pdf`;
-  const pdfUrl = await uploadToR2({ key: r2Key, body: pdfBuffer, contentType: 'application/pdf' });
+  // ── 4. Upload to private storage ──────────────────────────────────────────────
+  // Invoices carry customer and payment details, so they are never public. The
+  // key starts with the schema name so resolveFileUrl() signs it for this tenant only.
+  const pdfRef = await uploadPrivate({
+    key: `${schemaName}/invoices/${invoiceId}.pdf`,
+    body: pdfBuffer,
+    contentType: 'application/pdf',
+  });
 
   // ── 5. Update invoice record ──────────────────────────────────────────────────
-  await updateInvoicePdf(schemaName, invoiceId, pdfUrl);
-  await job.log(`[documents.worker] PDF uploaded to ${pdfUrl}`);
+  await updateInvoicePdf(schemaName, invoiceId, pdfRef);
+  await job.log(`[documents.worker] PDF stored as ${pdfRef}`);
 
   // ── 6. Email customer (if they have an email on file) ─────────────────────────
   if (customer?.email) {

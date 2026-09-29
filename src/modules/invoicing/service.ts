@@ -4,6 +4,15 @@ import { withTenantSchema } from '../../shared/db/tenant.js';
 import { invoices, orders, orderItems, productVariants } from '../../shared/db/schema/tenant.js';
 import { NotFoundError } from '../../shared/errors/types.js';
 import { documentsQueue } from '../../shared/queue/client.js';
+import { resolveFileUrl } from '../../shared/storage/private.js';
+
+// pdfUrl is stored as a private-storage reference; callers get a signed link.
+async function withSignedPdf<T extends { pdfUrl: string | null }>(
+  schemaName: string,
+  invoice: T,
+): Promise<T> {
+  return { ...invoice, pdfUrl: await resolveFileUrl(invoice.pdfUrl, schemaName) };
+}
 
 export async function updateInvoicePdf(
   schemaName: string,
@@ -54,7 +63,7 @@ export async function generateInvoice(schemaName: string, tenantId: string, orde
 }
 
 export async function getInvoice(schemaName: string, invoiceId: string) {
-  return withTenantSchema(schemaName, async (db) => {
+  const invoice = await withTenantSchema(schemaName, async (db) => {
     const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
     if (!invoice) throw new NotFoundError('Invoice', invoiceId);
 
@@ -83,11 +92,13 @@ export async function getInvoice(schemaName: string, invoiceId: string) {
 
     return invoice;
   });
+  return withSignedPdf(schemaName, invoice);
 }
 
 export async function listInvoices(schemaName: string, orderId?: string) {
-  return withTenantSchema(schemaName, async (db) => {
+  const rows = await withTenantSchema(schemaName, async (db) => {
     const where = orderId ? eq(invoices.orderId, orderId) : undefined;
     return db.select().from(invoices).where(where);
   });
+  return Promise.all(rows.map((row) => withSignedPdf(schemaName, row)));
 }
